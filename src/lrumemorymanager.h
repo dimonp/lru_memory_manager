@@ -97,6 +97,8 @@ public:
     const_iterator begin(bool lru = true) const;
     const_iterator end() const;
 
+    static LRUMemoryManager& get_instance();
+
 private:
     LRUMemoryHunk* get_head_hunk() const;
 

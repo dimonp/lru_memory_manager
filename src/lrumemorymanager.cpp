@@ -338,3 +338,9 @@ LRUMemoryManager::end() const
     LRUMemoryHunk* head_hunk_ptr = get_head_hunk();
     return LRUMemoryManager::const_iterator(head_hunk_ptr->handler_ptr);
 }
+
+LRUMemoryManager&
+LRUMemoryManager::get_instance() {
+    static LRUMemoryManager lru_memory_cache_;
+    return lru_memory_cache_;
+}

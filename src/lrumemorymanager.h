@@ -76,7 +76,7 @@ public:
     using iterator = Iterator<false>;
     using const_iterator = Iterator<true>;
 
-    explicit LRUMemoryManager(size_t mem_pool_size = 0x400000);
+    explicit LRUMemoryManager(size_t mem_pool_size = 4 * 1024 * 1024);
     ~LRUMemoryManager() noexcept;
 
     LRUMemoryManager(const LRUMemoryManager&) = delete;

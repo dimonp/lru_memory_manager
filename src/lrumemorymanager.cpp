@@ -7,6 +7,8 @@
 
 #include "lrumemorymanager.h"
 
+namespace lrumm {
+
 static constexpr size_t MEMORY_ALIGNMENT = 16;
 static constexpr size_t ALIGNMENT_MASK = MEMORY_ALIGNMENT - 1;
 
@@ -21,21 +23,21 @@ struct LRUMemoryManager::LRUMemoryHunk {
 LRUMemoryManager::LRUMemoryHandle*
 LRUMemoryManager::LRUMemoryHandle::next() const
 {
-    assert(hunk_ptr_ != nullptr);
+    PRECONDITION(hunk_ptr_ != nullptr);
     return hunk_ptr_->next_ptr->handler_ptr;
 }
 
 LRUMemoryManager::LRUMemoryHandle*
 LRUMemoryManager::LRUMemoryHandle::most_recent() const
 {
-    assert(hunk_ptr_ != nullptr);
+    PRECONDITION(hunk_ptr_ != nullptr);
     return hunk_ptr_->most_recent_ptr->handler_ptr;
 }
 
 size_t
 LRUMemoryManager::LRUMemoryHandle::size() const
 {
-    assert(hunk_ptr_ != nullptr);
+    PRECONDITION(hunk_ptr_ != nullptr);
     return hunk_ptr_->size - sizeof(LRUMemoryHunk);
 }
 
@@ -45,13 +47,13 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
     , mem_arena_ptr_(nullptr)
 {
     if (mem_pool_size == 0) {
-        log_error("Memory pool size cannot be zero.\n");
+        LOG_ERROR("Memory pool size cannot be zero.\n");
         std::abort();
     }
 
     mem_arena_ptr_ = std::malloc(mem_total_size_);
     if (!mem_arena_ptr_) {
-        log_error("Failed to allocate memory pool of size %zu.\n", mem_pool_size);
+        LOG_ERROR("Failed to allocate memory pool of size %zu.\n", mem_pool_size);
         std::abort();
     }
 
@@ -160,8 +162,6 @@ LRUMemoryManager::try_alloc(size_t size)
 void*
 LRUMemoryManager::real_get_buffer(LRUMemoryHandle *handle_ptr)
 {
-    assert(handle_ptr != nullptr);
-
     if (handle_ptr->hunk_ptr_ == nullptr) {
         return nullptr;
     }
@@ -178,9 +178,6 @@ LRUMemoryManager::real_get_buffer(LRUMemoryHandle *handle_ptr)
 void*
 LRUMemoryManager::real_alloc(LRUMemoryHandle *handle_ptr, size_t size)
 {
-    assert(size > 0);
-    assert(handle_ptr != nullptr);
-
     // Align size to MEMORY_ALIGNMENT boundary
     size_t aligned_size = (size + sizeof(LRUMemoryHunk) + ALIGNMENT_MASK) & ~ALIGNMENT_MASK;
 
@@ -210,9 +207,6 @@ LRUMemoryManager::real_alloc(LRUMemoryHandle *handle_ptr, size_t size)
 void
 LRUMemoryManager::real_free(LRUMemoryHandle *handle_ptr)
 {
-    assert(handle_ptr);
-    assert(handle_ptr->hunk_ptr_ && "LRUMemoryManager::real_free: not allocated.");
-
     LRUMemoryHunk* hunk_ptr = handle_ptr->hunk_ptr_;
 
     size_t size = hunk_ptr->size;
@@ -238,8 +232,8 @@ LRUMemoryManager::real_free(LRUMemoryHandle *handle_ptr)
 void
 LRUMemoryManager::unlink_lru(LRUMemoryHunk *hunk_ptr)
 {
-    assert(hunk_ptr);
-    assert(hunk_ptr->most_recent_ptr && hunk_ptr->least_recent_ptr && "LRUMemoryManager::unlink_lru: not linked.");
+    PRECONDITION(hunk_ptr);
+    PRECONDITION(hunk_ptr->most_recent_ptr && hunk_ptr->least_recent_ptr && "LRUMemoryManager::unlink_lru: not linked.");
 
     hunk_ptr->most_recent_ptr->least_recent_ptr = hunk_ptr->least_recent_ptr;
     hunk_ptr->least_recent_ptr->most_recent_ptr = hunk_ptr->most_recent_ptr;
@@ -249,8 +243,8 @@ LRUMemoryManager::unlink_lru(LRUMemoryHunk *hunk_ptr)
 void
 LRUMemoryManager::link_lru(LRUMemoryHunk *hunk_ptr)
 {
-    assert(hunk_ptr);
-    assert(!hunk_ptr->most_recent_ptr && !hunk_ptr->least_recent_ptr && "LRUMemoryManager::link_lru: already linked.");
+    PRECONDITION(hunk_ptr);
+    PRECONDITION(!hunk_ptr->most_recent_ptr && !hunk_ptr->least_recent_ptr && "LRUMemoryManager::link_lru: already linked.");
 
     // link to the top of the lru list
     LRUMemoryHunk* head_hunk_ptr = get_head_hunk();
@@ -263,22 +257,22 @@ LRUMemoryManager::link_lru(LRUMemoryHunk *hunk_ptr)
 void
 LRUMemoryManager::report_state() const
 {
-    log_info("------------ LRU state ------------\n");
+    LOG_INFO("------------ LRU state ------------\n");
 
     size_t hunk_idx = 0;
     for (const auto& handler : *this) {
-        log_info("%zu: %p (size: %zu)\n", hunk_idx, handler.hunk_ptr_, handler.hunk_ptr_->size);
+        LOG_INFO("%zu: %p (size: %zu)\n", hunk_idx, handler.hunk_ptr_, handler.hunk_ptr_->size);
         hunk_idx++;
     }
 
-    log_info("%4.2f Mb left\n", static_cast<float>(mem_total_size_ - mem_allocated_size_) / 1024.0f*1024.0f);
-    log_info("allocated: %zu, total pool size: %zu\n", mem_allocated_size_, mem_total_size_);
+    LOG_INFO("%4.2f Mb left\n", static_cast<float>(mem_total_size_ - mem_allocated_size_) / 1024.0f*1024.0f);
+    LOG_INFO("allocated: %zu, total pool size: %zu\n", mem_allocated_size_, mem_total_size_);
 }
 
 void
 LRUMemoryManager::debug_dump() const
 {
-    log_info("------------ Pool dump -----------------\n");
+    LOG_INFO("------------ Pool dump -----------------\n");
 
     size_t hunk_idx = 0;
     for (auto itr = begin(false); itr != end(); ++itr) {
@@ -289,11 +283,11 @@ LRUMemoryManager::debug_dump() const
         if (prev_hunk_raw_ptr + prev_hunk_ptr->size < reinterpret_cast<const uint8_t*>(current_hunk_ptr)) {
             // Free space found
             std::ptrdiff_t hunk_diff = reinterpret_cast<const uint8_t*>(current_hunk_ptr) - prev_hunk_raw_ptr - prev_hunk_ptr->size;
-            log_info("%zu: free space: %p (size: %zu)\n", hunk_idx, current_hunk_ptr, hunk_diff);
+            LOG_INFO("%zu: free space: %p (size: %zu)\n", hunk_idx, current_hunk_ptr, hunk_diff);
             hunk_idx++;
         }
 
-        log_info("%zu: allocated space: %p (size: %zu)\n", hunk_idx, current_hunk_ptr, current_hunk_ptr->size);
+        LOG_INFO("%zu: allocated space: %p (size: %zu)\n", hunk_idx, current_hunk_ptr, current_hunk_ptr->size);
         hunk_idx++;
     }
 
@@ -303,10 +297,10 @@ LRUMemoryManager::debug_dump() const
 
     if (last_pool_ptr > last_free_ptr) {
         std::ptrdiff_t last_diff = last_pool_ptr - last_free_ptr;
-        log_info("leading free space: %p (size: %zu)\n", last_free_ptr, last_diff);
+        LOG_INFO("leading free space: %p (size: %zu)\n", last_free_ptr, last_diff);
     }
 
-    log_info("used memory: %zu, total pool size %zu\n", mem_allocated_size_, mem_total_size_);
+    LOG_INFO("used memory: %zu, total pool size %zu\n", mem_allocated_size_, mem_total_size_);
 }
 
 LRUMemoryManager::iterator
@@ -343,4 +337,6 @@ LRUMemoryManager&
 LRUMemoryManager::get_instance() {
     static LRUMemoryManager lru_memory_cache_;
     return lru_memory_cache_;
+}
+
 }

@@ -3,7 +3,7 @@
 
 class LRUMemoryManagerTest: public ::testing::Test {
 protected:
-    LRUMemoryManager sut_;
+    lrumm::LRUMemoryManager sut_;
 
     LRUMemoryManagerTest() : sut_(2048) { }
 
@@ -20,22 +20,22 @@ protected:
 
 TEST_F(LRUMemoryManagerTest, CopyDisabled)
 {
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     sut_.alloc(&handle, 50);
 
-    LRUMemoryManager::LRUMemoryHandle handle_copy;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle_copy;
     ASSERT_DEATH(handle_copy = handle, "");
-    ASSERT_DEATH({ LRUMemoryManager::LRUMemoryHandle handle_copy = handle; }, "");
+    ASSERT_DEATH({ lrumm::LRUMemoryManager::LRUMemoryHandle handle_copy = handle; }, "");
 }
 
 TEST_F(LRUMemoryManagerTest, MoveDisabled)
 {
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     sut_.alloc(&handle, 50);
 
-    LRUMemoryManager::LRUMemoryHandle handle_copy;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle_copy;
     ASSERT_DEATH(handle_copy = std::move(handle), "");
-    ASSERT_DEATH({ LRUMemoryManager::LRUMemoryHandle handle_copy = std::move(handle); }, "");
+    ASSERT_DEATH({ lrumm::LRUMemoryManager::LRUMemoryHandle handle_copy = std::move(handle); }, "");
 }
 
 TEST_F(LRUMemoryManagerTest, InitialState)
@@ -47,7 +47,7 @@ TEST_F(LRUMemoryManagerTest, AllocateOne)
 {
     constexpr size_t kExpectedSize = 50;
 
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     sut_.alloc(&handle, kExpectedSize);
 
     EXPECT_NE(sut_.begin(), sut_.end()) << "Should not be empty.";
@@ -60,7 +60,7 @@ TEST_F(LRUMemoryManagerTest, AllocateThreeOrder)
 {
     constexpr size_t kExpectedSize0 = 250, kExpectedSize1 = 150, kExpectedSize2 = 50;
 
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
     sut_.alloc(&handle2, kExpectedSize2);
@@ -86,7 +86,7 @@ TEST_F(LRUMemoryManagerTest, AllocateThreeOrderLru)
 {
     constexpr size_t kExpectedSize0 = 50, kExpectedSize1 = 150, kExpectedSize2 = 250;
 
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
     sut_.alloc(&handle2, kExpectedSize2);
@@ -112,7 +112,7 @@ TEST_F(LRUMemoryManagerTest, UpdateLruOrder)
 {
     constexpr size_t kExpectedSize0 = 50, kExpectedSize1 = 150, kExpectedSize2 = 250;
 
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
     sut_.alloc(&handle2, kExpectedSize2);
@@ -141,7 +141,7 @@ TEST_F(LRUMemoryManagerTest, AllocateOneThenFree)
 {
     constexpr size_t kExpectedSize = 50;
 
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     sut_.alloc(&handle, kExpectedSize);
     sut_.free(&handle);
 
@@ -151,7 +151,7 @@ TEST_F(LRUMemoryManagerTest, AllocateOneThenFree)
 TEST_F(LRUMemoryManagerTest, AllocateThreeThenFreeOne)
 {
     constexpr size_t kExpectedSize0 = 250, kExpectedSize1 = 50, kExpectedSize2 = 150;
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
 
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
@@ -173,7 +173,7 @@ TEST_F(LRUMemoryManagerTest, AllocateThreeThenFreeOne)
 TEST_F(LRUMemoryManagerTest, AllocateThreeThenFreeOneThenAllocOne)
 {
     constexpr size_t kExpectedSize0 = 250, kExpectedSize1 = 50, kExpectedSize2 = 150;
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
 
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
@@ -200,7 +200,7 @@ TEST_F(LRUMemoryManagerTest, AllocateThreeThenFreeOneThenAllocOne)
 TEST_F(LRUMemoryManagerTest, AllocateNoFreeSpace)
 {
     constexpr size_t kExpectedSize0 = 250, kExpectedSize1 = 50, kExpectedOverflowSize = 4096;
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
 
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
@@ -216,7 +216,7 @@ TEST_F(LRUMemoryManagerTest, GetAllocatedMemorySize)
     size_t initial_size = sut_.get_allocated_memory_size();
 
     constexpr size_t kExpectedSize = 50;
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     sut_.alloc(&handle, kExpectedSize);
 
     // Check that allocated size is greater than 0 (exact size depends on alignment)
@@ -230,7 +230,7 @@ TEST_F(LRUMemoryManagerTest, GetAllocatedMemorySize)
 TEST_F(LRUMemoryManagerTest, Flush)
 {
     constexpr size_t kExpectedSize0 = 50, kExpectedSize1 = 150, kExpectedSize2 = 250;
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
 
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
@@ -246,7 +246,7 @@ TEST_F(LRUMemoryManagerTest, Flush)
 TEST_F(LRUMemoryManagerTest, HandleMethods)
 {
     constexpr size_t kExpectedSize = 100;
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     void* ptr = sut_.alloc(&handle, kExpectedSize);
 
     EXPECT_NE(ptr, nullptr) << "Allocation should succeed.";
@@ -257,14 +257,14 @@ TEST_F(LRUMemoryManagerTest, HandleMethods)
 TEST_F(LRUMemoryManagerTest, GetBufferAndRefreshReturnValue)
 {
     constexpr size_t kExpectedSize = 100;
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     void* alloc_ptr = sut_.alloc(&handle, kExpectedSize);
 
     void* buffer_ptr = sut_.get_buffer_and_refresh(&handle);
     EXPECT_EQ(alloc_ptr, buffer_ptr) << "get_buffer_and_refresh should return the same pointer as alloc.";
 
     // Test with null handle
-    LRUMemoryManager::LRUMemoryHandle null_handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle null_handle;
     void* null_ptr = sut_.get_buffer_and_refresh(&null_handle);
     EXPECT_EQ(null_ptr, nullptr) << "get_buffer_and_refresh should return nullptr for unallocated handle.";
 }
@@ -272,12 +272,12 @@ TEST_F(LRUMemoryManagerTest, GetBufferAndRefreshReturnValue)
 TEST_F(LRUMemoryManagerTest, ConstIterator)
 {
     constexpr size_t kExpectedSize0 = 50, kExpectedSize1 = 150;
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1;
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
 
     // Test const iterator functionality
-    const LRUMemoryManager& const_sut = sut_;
+    const lrumm::LRUMemoryManager& const_sut = sut_;
     auto const_itr = const_sut.begin(false);
     EXPECT_NE(const_itr, const_sut.end());
     EXPECT_GE(const_itr->size(), kExpectedSize0);
@@ -290,7 +290,7 @@ TEST_F(LRUMemoryManagerTest, ConstIterator)
 
 TEST_F(LRUMemoryManagerTest, ZeroSizeAllocation)
 {
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     ASSERT_DEATH(sut_.alloc(&handle, 0), "") << "Zero size allocation is not allowed.";
 }
 
@@ -298,7 +298,7 @@ TEST_F(LRUMemoryManagerTest, LruEvictionOrder)
 {
     // Allocate chunks that should fill most of the memory
     constexpr size_t kAllocateSize = 400;
-    LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3, handle4;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3, handle4;
 
     // Allocate 4 chunks
     void* ptr1 = sut_.alloc(&handle1, kAllocateSize);
@@ -317,7 +317,7 @@ TEST_F(LRUMemoryManagerTest, LruEvictionOrder)
 
     // Allocate another chunk, which should cause eviction of the least recently used
     // Since we accessed handle2, handle1 should be evicted
-    LRUMemoryManager::LRUMemoryHandle handle5;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle5;
     void* ptr5 = sut_.alloc(&handle5, kAllocateSize);
 
     EXPECT_NE(ptr5, nullptr) << "New allocation should succeed.";
@@ -330,7 +330,7 @@ TEST_F(LRUMemoryManagerTest, LruEvictionOrder)
 
 TEST_F(LRUMemoryManagerTest, IteratorComparison)
 {
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     sut_.alloc(&handle, 100);
 
     // Test iterator comparison operators
@@ -348,7 +348,7 @@ TEST_F(LRUMemoryManagerTest, IteratorComparison)
 TEST_F(LRUMemoryManagerTest, AllocateFiveThenFreeTwo)
 {
     constexpr size_t kExpectedSize0 = 50, kExpectedSize1 = 150, kExpectedSize2 = 250, kExpectedSize3 = 350, kExpectedSize4 = 450;
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2, handle3, handle4;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2, handle3, handle4;
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
     sut_.alloc(&handle2, kExpectedSize2);
@@ -375,7 +375,7 @@ TEST_F(LRUMemoryManagerTest, AllocateFiveThenFreeTwo)
 TEST_F(LRUMemoryManagerTest, AllocateThreeEvictOne)
 {
     constexpr size_t kExpectedSize0 = 900, kExpectedSize1 = 900, kExpectedSize2 = 900;
-    LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
     sut_.alloc(&handle0, kExpectedSize0);
     sut_.alloc(&handle1, kExpectedSize1);
     sut_.alloc(&handle2, kExpectedSize2);
@@ -395,7 +395,7 @@ TEST_F(LRUMemoryManagerTest, AsanPositiveAllocation)
 {
     // This test verifies that normal allocation/deallocation doesn't trigger ASAN errors
     constexpr size_t kExpectedSize = 100;
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
 
     // Allocate memory - should not trigger ASAN errors
     void* ptr = sut_.alloc(&handle, kExpectedSize);
@@ -415,7 +415,7 @@ TEST_F(LRUMemoryManagerTest, AsanPositiveMultipleAllocations)
 {
     // This test verifies that multiple allocations don't trigger ASAN errors
     constexpr size_t kExpectedSize = 50;
-    LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3;
 
     // Allocate multiple chunks
     void* ptr1 = sut_.alloc(&handle1, kExpectedSize);
@@ -441,7 +441,7 @@ TEST_F(LRUMemoryManagerTest, AsanPositiveFlush)
 {
     // This test verifies that flush operation doesn't trigger ASAN errors
     constexpr size_t kExpectedSize = 75;
-    LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3;
 
     // Allocate multiple chunks
     sut_.alloc(&handle1, kExpectedSize);
@@ -460,7 +460,7 @@ TEST_F(LRUMemoryManagerTest, AsanFalseUseAfterFree)  // Disabled because it woul
     // This test demonstrates what would happen with use-after-free
     // In a real ASAN environment, this would trigger an error
     constexpr size_t kExpectedSize = 100;
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
 
     void* ptr = sut_.alloc(&handle, kExpectedSize);
     ASSERT_NE(ptr, nullptr) << "Allocation should succeed.";
@@ -480,7 +480,7 @@ TEST_F(LRUMemoryManagerTest, AsanFalseBufferOverflow)  // Disabled because it wo
     // This test demonstrates what would happen with buffer overflow
     // In a real ASAN environment, this would trigger an error
     constexpr size_t kExpectedSize = 100;
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
 
     void* ptr = sut_.alloc(&handle, kExpectedSize);
     ASSERT_NE(ptr, nullptr) << "Allocation should succeed.";
@@ -497,7 +497,7 @@ TEST_F(LRUMemoryManagerTest, AsanPoisoningVerification)
 {
     // This test verifies that memory is properly poisoned and unpoisoned
     constexpr size_t kExpectedSize = 100;
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
 
     // Before allocation, memory should be poisoned (simulated by checking allocation behavior)
     void* ptr1 = sut_.alloc(&handle, kExpectedSize);
@@ -523,7 +523,7 @@ TEST_F(LRUMemoryManagerTest, AsanEvictionPoisoning)
     constexpr size_t kLargeSize = 1700;  // Large enough to trigger eviction
 
     // Allocate small chunks first
-    LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3;
     void* ptr1 = sut_.alloc(&handle1, kSmallSize);
     void* ptr2 = sut_.alloc(&handle2, kSmallSize);
     void* ptr3 = sut_.alloc(&handle3, kSmallSize);
@@ -536,7 +536,7 @@ TEST_F(LRUMemoryManagerTest, AsanEvictionPoisoning)
     sut_.get_buffer_and_refresh(&handle2);
 
     // Allocate a large chunk that should cause eviction of least recently used (handle1)
-    LRUMemoryManager::LRUMemoryHandle handle4;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle4;
     void* ptr4 = sut_.alloc(&handle4, kLargeSize);
 
     EXPECT_NE(ptr4, nullptr) << "Large allocation should succeed.";

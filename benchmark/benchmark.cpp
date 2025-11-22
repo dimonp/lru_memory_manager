@@ -5,8 +5,8 @@
 
 // Benchmark for allocating memory using 'alloc'
 static void BM_LRUAllocAllocation(benchmark::State& state) {
-    LRUMemoryManager manager(16 * 1024 * 1024);
-    LRUMemoryManager::LRUMemoryHandle handle;
+    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
 
     size_t size = state.range(0); // Get size from benchmark argument
     for (auto _ : state) {
@@ -20,12 +20,12 @@ static void BM_LRUAllocAllocation(benchmark::State& state) {
 
 // Benchmark for get_buffer_and_refresh (accessing and refreshing LRU items)
 static void BM_LRUGetBufferAndRefresh(benchmark::State& state) {
-    LRUMemoryManager manager(16 * 1024 * 1024);
+    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
     size_t num_handles = state.range(0);
     size_t alloc_size = state.range(1);
 
     // Pre-allocate handles
-    std::vector<LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
+    std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
     std::vector<void*> pointers(num_handles);
 
     // Allocate all memory first
@@ -54,12 +54,12 @@ static void BM_LRUGetBufferAndRefresh(benchmark::State& state) {
 
 // Benchmark for freeing memory
 static void BM_LRUFree(benchmark::State& state) {
-    LRUMemoryManager manager(16 * 1024 * 1024);
+    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
     size_t num_handles = state.range(0);
     size_t alloc_size = state.range(1);
 
     // Pre-allocate handles
-    std::vector<LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
+    std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
     std::vector<void*> pointers(num_handles);
 
     // Allocate all memory first
@@ -92,12 +92,12 @@ static void BM_LRUFree(benchmark::State& state) {
 
 // Benchmark for mixed allocation/deallocation workload
 static void BM_LRUMixedWorkload(benchmark::State& state) {
-    LRUMemoryManager manager(16 * 1024 * 1024);
+    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
     size_t num_handles = state.range(0);
     size_t alloc_size = state.range(1);
 
     // Pre-allocate handles
-    std::vector<LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
+    std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
     std::vector<void*> pointers(num_handles);
 
     // Allocate all memory first
@@ -154,11 +154,11 @@ static void BM_LRUEviction(benchmark::State& state) {
     size_t alloc_size = state.range(1);
     size_t num_allocations = state.range(2);
 
-    LRUMemoryManager manager(pool_size);
+    lrumm::LRUMemoryManager manager(pool_size);
 
     // Pre-allocate handles
-    LRUMemoryManager::LRUMemoryHandle handle;
-    std::vector<LRUMemoryManager::LRUMemoryHandle> handles(num_allocations);
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle;
+    std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles(num_allocations);
     std::vector<void*> pointers(num_allocations);
 
     size_t evicted_count = 0;
@@ -186,12 +186,12 @@ static void BM_LRUEviction(benchmark::State& state) {
 
 // Benchmark for iterator performance
 static void BM_LRUIterator(benchmark::State& state) {
-    LRUMemoryManager manager(16 * 1024 * 1024);
+    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
     size_t num_handles = state.range(0);
     size_t alloc_size = state.range(1);
 
     // Pre-allocate handles
-    std::vector<LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
+    std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles(num_handles);
     std::vector<void*> pointers(num_handles);
 
     // Allocate all memory first

@@ -2,13 +2,29 @@
 #define LRU_MEMORY_MANAGER_H
 
 #include <cstddef>
-#include <cassert>
 #include <cstdio>
 #include <iterator>
 #include <type_traits>
 
-#define log_error(...) std::fprintf(stderr, __VA_ARGS__)
-#define log_info(...) std::fprintf(stdout, __VA_ARGS__)
+#ifndef LOG_ERROR
+#define LOG_ERROR(...) std::fprintf(stderr, __VA_ARGS__)
+#endif
+
+#ifndef LOG_INFO
+#define LOG_INFO(...) std::fprintf(stdout, __VA_ARGS__)
+#endif
+
+#ifndef PRECONDITION
+#define PRECONDITION(condition) \
+    do { \
+        if (!(condition)) { \
+            LOG_ERROR("Precondition failed: %s in %s: %i \n", #condition,  __FILE__, __LINE__); \
+            std::abort(); \
+        } \
+    } while (0)
+#endif
+
+namespace lrumm {
 
 /**
  * @brief A memory manager implementing an LRU (Least Recently Used) eviction strategy
@@ -30,10 +46,10 @@ public:
         LRUMemoryHandle() = default;
 
         // Should not be copying and moving after initialization
-        LRUMemoryHandle(const LRUMemoryHandle& other) { assert(other.hunk_ptr_ == nullptr && "Copyable in initial state only."); }
-        void operator= (const LRUMemoryHandle& other) { assert(other.hunk_ptr_ == nullptr && "Copyable in initial state only."); }
-        LRUMemoryHandle(LRUMemoryHandle&& other) { assert(other.hunk_ptr_ == nullptr && "Movable in initial state only."); }
-        void operator= (LRUMemoryHandle&& other) { assert(other.hunk_ptr_ == nullptr && "Movable in initial state only."); }
+        LRUMemoryHandle(const LRUMemoryHandle& other) { PRECONDITION(other.hunk_ptr_ == nullptr && "Copyable in initial state only."); }
+        void operator= (const LRUMemoryHandle& other) { PRECONDITION(other.hunk_ptr_ == nullptr && "Copyable in initial state only."); }
+        LRUMemoryHandle(LRUMemoryHandle&& other) { PRECONDITION(other.hunk_ptr_ == nullptr && "Movable in initial state only."); }
+        void operator= (LRUMemoryHandle&& other) { PRECONDITION(other.hunk_ptr_ == nullptr && "Movable in initial state only."); }
 
         const LRUMemoryHunk* hunk_ptr() const { return hunk_ptr_; }
 
@@ -127,6 +143,8 @@ inline
 void*
 LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle_ptr)
 {
+    PRECONDITION(handle_ptr != nullptr);
+
     return real_get_buffer(handle_ptr);
 }
 
@@ -134,6 +152,9 @@ inline
 void
 LRUMemoryManager::free(LRUMemoryHandle *handle_ptr)
 {
+    PRECONDITION(handle_ptr);
+    PRECONDITION(handle_ptr->hunk_ptr_ && "LRUMemoryManager::free: not allocated.");
+
     real_free(handle_ptr);
 }
 
@@ -141,6 +162,9 @@ inline
 void*
 LRUMemoryManager::alloc(LRUMemoryHandle *handle_ptr, size_t size)
 {
+    PRECONDITION(size > 0);
+    PRECONDITION(handle_ptr != nullptr);
+
     return real_alloc(handle_ptr, size);
 }
 
@@ -151,4 +175,5 @@ LRUMemoryManager::get_allocated_memory_size() const
     return mem_allocated_size_;
 }
 
+}
 #endif // LRU_MEMORY_MANAGER_H

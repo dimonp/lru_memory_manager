@@ -23,21 +23,21 @@ struct LRUMemoryManager::LRUMemoryHunk {
 LRUMemoryManager::LRUMemoryHandle*
 LRUMemoryManager::LRUMemoryHandle::next() const
 {
-    PRECONDITION(hunk_ptr_ != nullptr);
+    Expects(hunk_ptr_ != nullptr);
     return hunk_ptr_->next_ptr->handler_ptr;
 }
 
 LRUMemoryManager::LRUMemoryHandle*
 LRUMemoryManager::LRUMemoryHandle::most_recent() const
 {
-    PRECONDITION(hunk_ptr_ != nullptr);
+    Expects(hunk_ptr_ != nullptr);
     return hunk_ptr_->most_recent_ptr->handler_ptr;
 }
 
 size_t
 LRUMemoryManager::LRUMemoryHandle::size() const
 {
-    PRECONDITION(hunk_ptr_ != nullptr);
+    Expects(hunk_ptr_ != nullptr);
     return hunk_ptr_->size - sizeof(LRUMemoryHunk);
 }
 
@@ -46,10 +46,7 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
     , mem_allocated_size_(0)
     , mem_arena_ptr_(nullptr)
 {
-    if (mem_pool_size == 0) {
-        LOG_ERROR("Memory pool size cannot be zero.\n");
-        std::abort();
-    }
+    Expects(mem_pool_size > 0);
 
     mem_arena_ptr_ = std::malloc(mem_total_size_);
     if (!mem_arena_ptr_) {
@@ -201,7 +198,7 @@ LRUMemoryManager::real_alloc(LRUMemoryHandle *handle_ptr, size_t size)
         }
     }
 
-    std::abort(); // unreachable
+    Ensures(false); // unreachable
 }
 
 void
@@ -232,8 +229,8 @@ LRUMemoryManager::real_free(LRUMemoryHandle *handle_ptr)
 void
 LRUMemoryManager::unlink_lru(LRUMemoryHunk *hunk_ptr)
 {
-    PRECONDITION(hunk_ptr);
-    PRECONDITION(hunk_ptr->most_recent_ptr && hunk_ptr->least_recent_ptr && "LRUMemoryManager::unlink_lru: not linked.");
+    Expects(hunk_ptr);
+    Expects(hunk_ptr->most_recent_ptr && hunk_ptr->least_recent_ptr); // LRUMemoryManager::unlink_lru: not linked.
 
     hunk_ptr->most_recent_ptr->least_recent_ptr = hunk_ptr->least_recent_ptr;
     hunk_ptr->least_recent_ptr->most_recent_ptr = hunk_ptr->most_recent_ptr;
@@ -243,8 +240,8 @@ LRUMemoryManager::unlink_lru(LRUMemoryHunk *hunk_ptr)
 void
 LRUMemoryManager::link_lru(LRUMemoryHunk *hunk_ptr)
 {
-    PRECONDITION(hunk_ptr);
-    PRECONDITION(!hunk_ptr->most_recent_ptr && !hunk_ptr->least_recent_ptr && "LRUMemoryManager::link_lru: already linked.");
+    Expects(hunk_ptr);
+    Expects(!hunk_ptr->most_recent_ptr && !hunk_ptr->least_recent_ptr); // LRUMemoryManager::link_lru: already linked.
 
     // link to the top of the lru list
     LRUMemoryHunk* head_hunk_ptr = get_head_hunk();

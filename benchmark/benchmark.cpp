@@ -1,4 +1,5 @@
 #include <benchmark/benchmark.h>
+
 #include "lrumemorymanager.h"
 #include <vector>
 #include <random>
@@ -9,7 +10,7 @@ static void BM_LRUAllocAllocation(benchmark::State& state) {
     lrumm::LRUMemoryManager::LRUMemoryHandle handle;
 
     size_t size = state.range(0); // Get size from benchmark argument
-    for (auto _ : state) {
+    for ([[maybe_unused]] auto _ : state) {
         void* data = manager.alloc(&handle, size);
         benchmark::DoNotOptimize(data); // Prevent compiler from optimizing out allocation
         manager.free(&handle); // Deallocate memory
@@ -35,7 +36,7 @@ static void BM_LRUGetBufferAndRefresh(benchmark::State& state) {
     }
 
     size_t index = 0;
-    for (auto _ : state) {
+    for ([[maybe_unused]] auto _ : state) {
         // Access and refresh a buffer (moves it to front of LRU list)
         void* data = manager.get_buffer_and_refresh(&handles[index]);
         benchmark::DoNotOptimize(data);
@@ -69,7 +70,7 @@ static void BM_LRUFree(benchmark::State& state) {
     }
 
     size_t index = 0;
-    for (auto _ : state) {
+    for ([[maybe_unused]] auto _ : state) {
         // Free a buffer
         manager.free(&handles[index]);
         benchmark::DoNotOptimize(handles[index]);
@@ -114,7 +115,7 @@ static void BM_LRUMixedWorkload(benchmark::State& state) {
     size_t alloc_count = 0;
     size_t free_count = 0;
 
-    for (auto _ : state) {
+    for ([[maybe_unused]] auto _ : state) {
         // Randomly choose to allocate or free
         int choice = dis(gen) % 2;
         size_t index = dis(gen);
@@ -163,7 +164,7 @@ static void BM_LRUEviction(benchmark::State& state) {
 
     size_t evicted_count = 0;
 
-    for (auto _ : state) {
+    for ([[maybe_unused]] auto _ : state) {
 
         // Allocate all memory
         for (size_t i = 0; i < num_allocations; ++i) {
@@ -201,7 +202,7 @@ static void BM_LRUIterator(benchmark::State& state) {
     }
 
     size_t count = 0;
-    for (auto _ : state) {
+    for ([[maybe_unused]] auto _ : state) {
         // Iterate through all allocations in LRU order
         for (auto& handle : manager) {
             benchmark::DoNotOptimize(handle);

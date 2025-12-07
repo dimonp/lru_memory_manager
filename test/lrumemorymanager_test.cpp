@@ -1,4 +1,5 @@
 #include "gtest/gtest.h"
+
 #include "lrumemorymanager.h"
 
 class LRUMemoryManagerTest: public ::testing::Test {
@@ -387,6 +388,28 @@ TEST_F(LRUMemoryManagerTest, AllocateThreeEvictOne)
     EXPECT_EQ(++itr, sut_.end()) << "Should be last.";
     EXPECT_EQ(handle0.hunk_ptr(), nullptr) << "Should have been evicted.";
 }
+
+TEST_F(LRUMemoryManagerTest, HandleDestruction)
+{
+constexpr size_t kExpectedSize0 = 250, kExpectedSize1 = 50, kExpectedSize2 = 150;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+
+    sut_.alloc(&handle0, kExpectedSize0);
+    sut_.alloc(&handle1, kExpectedSize1);
+    sut_.alloc(&handle2, kExpectedSize2);
+
+    handle1.~LRUMemoryHandle();
+
+    auto itr = sut_.begin(false);
+    EXPECT_NE(itr, sut_.end()) << "Should not be empty.";
+    EXPECT_GE(itr->size(), kExpectedSize0);
+    EXPECT_EQ(itr->hunk_ptr(), handle0.hunk_ptr());
+    ++itr;
+    EXPECT_NE(itr, sut_.end());
+    EXPECT_GE(itr->size(), kExpectedSize2);
+    EXPECT_EQ(itr->hunk_ptr(), handle2.hunk_ptr());
+    ++itr;
+    EXPECT_EQ(itr, sut_.end()) << "Should be last.";}
 
 #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
 

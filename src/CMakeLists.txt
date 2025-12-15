@@ -16,20 +16,22 @@ target_link_libraries(lru_memory_manager PRIVATE Microsoft.GSL::GSL)
 set_target_properties(lru_memory_manager PROPERTIES LINKER_LANGUAGE CXX)
 target_compile_options(lru_memory_manager PRIVATE -O3)
 
-# test version target
-add_library(lru_memory_manager_t
-    lrumemorymanager.cpp
-    lrumemorymanager.h
-)
+if(BUILD_TESTING)
+    # test version target
+    add_library(lru_memory_manager_t
+        lrumemorymanager.cpp
+        lrumemorymanager.h
+    )
 
-target_include_directories(lru_memory_manager_t PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include/lru_memory_manager>
-)
-target_link_libraries(lru_memory_manager_t PRIVATE Microsoft.GSL::GSL)
-set_target_properties(lru_memory_manager_t PROPERTIES LINKER_LANGUAGE CXX)
-target_compile_options(lru_memory_manager_t PRIVATE -fsanitize=address -O1 -fno-omit-frame-pointer)
-target_link_options(lru_memory_manager_t PRIVATE -fsanitize=address)
+    target_include_directories(lru_memory_manager_t PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<INSTALL_INTERFACE:include/lru_memory_manager>
+    )
+    target_link_libraries(lru_memory_manager_t PRIVATE Microsoft.GSL::GSL)
+    set_target_properties(lru_memory_manager_t PROPERTIES LINKER_LANGUAGE CXX)
+    target_compile_options(lru_memory_manager_t PRIVATE -fsanitize=address -O1 -fno-omit-frame-pointer)
+    target_link_options(lru_memory_manager_t PRIVATE -fsanitize=address)
+endif()
 
 install(TARGETS lru_memory_manager EXPORT lru_memory_manager_targets
         ARCHIVE DESTINATION lib

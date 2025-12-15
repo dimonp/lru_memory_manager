@@ -17,6 +17,8 @@ static void BM_LRUAllocAllocation(benchmark::State& state) {
     }
     state.SetBytesProcessed(int64_t(state.iterations()) * size);
     state.SetLabel("alloc");
+
+    state.SetComplexityN(state.range(0));
 }
 
 // Benchmark for get_buffer_and_refresh (accessing and refreshing LRU items)
@@ -51,6 +53,8 @@ static void BM_LRUGetBufferAndRefresh(benchmark::State& state) {
 
     state.SetItemsProcessed(state.iterations());
     state.SetLabel("get_buffer_and_refresh");
+
+    state.SetComplexityN(state.range(1));
 }
 
 // Benchmark for freeing memory
@@ -89,6 +93,8 @@ static void BM_LRUFree(benchmark::State& state) {
 
     state.SetItemsProcessed(state.iterations());
     state.SetLabel("free");
+
+    state.SetComplexityN(state.range(1));
 }
 
 // Benchmark for mixed allocation/deallocation workload
@@ -147,6 +153,8 @@ static void BM_LRUMixedWorkload(benchmark::State& state) {
 
     state.SetItemsProcessed(state.iterations());
     state.SetLabel("mixed_workload");
+
+    state.SetComplexityN(state.range(1));
 }
 
 // Benchmark for LRU eviction performance
@@ -183,6 +191,8 @@ static void BM_LRUEviction(benchmark::State& state) {
     state.SetItemsProcessed(state.iterations() * num_allocations);
     state.SetLabel("eviction");
     state.counters["Evictions"] = benchmark::Counter(evicted_count, benchmark::Counter::kAvgThreads);
+
+    state.SetComplexityN(state.range(1));
 }
 
 // Benchmark for iterator performance
@@ -217,13 +227,15 @@ static void BM_LRUIterator(benchmark::State& state) {
 
     state.SetItemsProcessed(state.iterations() * num_handles);
     state.SetLabel("iterator");
+
+    state.SetComplexityN(state.range(1));
 }
 
-BENCHMARK(BM_LRUAllocAllocation)->Range(8, 8 << 20);
-BENCHMARK(BM_LRUGetBufferAndRefresh)->Ranges({{1, 1 << 10}, {64, 1 << 10}});
-BENCHMARK(BM_LRUFree)->Ranges({{1, 1 << 10}, {64, 1 << 10}});
-BENCHMARK(BM_LRUMixedWorkload)->Ranges({{1, 1 << 10}, {64, 1 << 10}});
-BENCHMARK(BM_LRUEviction)->Ranges({{1024, 16 * 1024}, {32, 128}, {10, 100}});
-BENCHMARK(BM_LRUIterator)->Ranges({{1, 1 << 10}, {64, 1 << 10}});
+BENCHMARK(BM_LRUAllocAllocation)->Range(8, 8 << 20)->Complexity();
+BENCHMARK(BM_LRUGetBufferAndRefresh)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
+BENCHMARK(BM_LRUFree)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
+BENCHMARK(BM_LRUMixedWorkload)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
+BENCHMARK(BM_LRUEviction)->Ranges({{1024, 16 * 1024}, {32, 128}, {10, 100}})->Complexity();
+BENCHMARK(BM_LRUIterator)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
 
 BENCHMARK_MAIN();

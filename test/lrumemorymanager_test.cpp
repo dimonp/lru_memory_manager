@@ -2,6 +2,18 @@
 
 #include "lrumemorymanager.h"
 
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+    // Code specific to compilers that support __has_feature(address_sanitizer)
+#    define ASAN_ENABLED
+#  endif
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+// Code specific to MSVC or other compilers defining this macro
+#  define ASAN_ENABLED
+#endif
+
 class LRUMemoryManagerTest: public ::testing::Test {
 protected:
     lrumm::LRUMemoryManager sut_;
@@ -411,7 +423,7 @@ constexpr size_t kExpectedSize0 = 250, kExpectedSize1 = 50, kExpectedSize2 = 150
     ++itr;
     EXPECT_EQ(itr, sut_.end()) << "Should be last.";}
 
-#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+#if defined(ASAN_ENABLED)
 
 // ASAN Positive Scenario Tests
 TEST_F(LRUMemoryManagerTest, AsanPositiveAllocation)

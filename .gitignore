@@ -4,6 +4,7 @@
 !.clang-format
 !.clang-tidy
 build/
+install/
 .vscode
 CMakeLists.txt.user
 CMakeCache.txt

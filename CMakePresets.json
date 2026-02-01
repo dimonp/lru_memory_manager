@@ -1,35 +1,59 @@
 {
-  "version": 3,
-  "configurePresets": [
-    {
-      "name": "core",
-      "hidden": true,
-      "generator": "Ninja",
-      "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      }
-    },
-    {
-        "name": "msbuild-debug",
-        "displayName": "MSBUILD Debug",
-        "description": "Target Windows with the msvc compiler, debug build type",
-        "inherits": "core",
-        "cacheVariables": {
-            "CMAKE_C_COMPILER": "cl",
-            "CMAKE_CXX_COMPILER": "cl",
-            "CMAKE_BUILD_TYPE": "Debug"
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "core",
+            "hidden": true,
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
+            "name": "msbuild-debug",
+            "displayName": "MSBUILD Debug",
+            "description": "Target Windows with the msvc compiler, debug build type",
+            "inherits": "core",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_CXX_COMPILER": "cl",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "msbuild-release",
+            "displayName": "MSBUILD Release",
+            "description": "Target Windows with the msvc compiler, debug build type",
+            "inherits": "core",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_CXX_COMPILER": "cl",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ENABLE_SANITIZERS": "OFF"
+            }
+        },
+        {
+            "name": "gcc-debug",
+            "displayName": "GCC Debug",
+            "description": "Target Unix-like OS with the gcc compiler, debug build type",
+            "inherits": "core",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "gcc-release",
+            "displayName": "GCC Release",
+            "description": "Target Unix-like OS with the gcc compiler, debug build type",
+            "inherits": "core",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ENABLE_SANITIZERS": "OFF"
+            }
         }
-    },
-    {
-      "name": "gcc-debug",
-      "displayName": "GCC Debug",
-      "description": "Target Unix-like OS with the gcc compiler, debug build type",
-      "inherits": "core",
-      "cacheVariables": {
-          "CMAKE_C_COMPILER": "gcc",
-          "CMAKE_CXX_COMPILER": "g++",
-          "CMAKE_BUILD_TYPE": "Debug"
-      }
-    }
-  ]
+    ]
 }

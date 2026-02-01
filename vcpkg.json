@@ -2,9 +2,17 @@
   "name": "assets-mpq-importer",
   "version-string": "0.0.1",
   "dependencies": [
-    "ms-gsl",
-    "gtest",
-    "benchmark"
+    "ms-gsl"
   ],
+  "features": {
+    "tests": {
+      "description": "Build tests",
+      "dependencies": [
+        "gtest",
+        "benchmark"
+      ]
+    }
+  },
+
   "builtin-baseline": "3895230f38e498525f2560a281223d12066fa74a"
 }

@@ -15,7 +15,6 @@
             "description": "Target Windows with the msvc compiler, debug build type",
             "inherits": "core",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl",
                 "CMAKE_CXX_COMPILER": "cl",
                 "CMAKE_BUILD_TYPE": "Debug"
             }
@@ -26,7 +25,6 @@
             "description": "Target Windows with the msvc compiler, debug build type",
             "inherits": "core",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl",
                 "CMAKE_CXX_COMPILER": "cl",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "ENABLE_SANITIZERS": "OFF"
@@ -38,7 +36,6 @@
             "description": "Target Unix-like OS with the gcc compiler, debug build type",
             "inherits": "core",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "gcc",
                 "CMAKE_CXX_COMPILER": "g++",
                 "CMAKE_BUILD_TYPE": "Debug"
             }
@@ -49,7 +46,6 @@
             "description": "Target Unix-like OS with the gcc compiler, debug build type",
             "inherits": "core",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "gcc",
                 "CMAKE_CXX_COMPILER": "g++",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "ENABLE_SANITIZERS": "OFF"

@@ -3,7 +3,7 @@
 !.gitignore
 !.clang-format
 !.clang-tidy
-build/
+build*/
 install/
 .vscode
 CMakeLists.txt.user

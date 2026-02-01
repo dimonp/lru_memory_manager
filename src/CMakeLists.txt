@@ -5,6 +5,7 @@ add_library(lru_memory_manager
     lrumemorymanager.cpp
     lrumemorymanager.h
 )
+add_library(lrumm::lru_memory_manager ALIAS lru_memory_manager)
 
 target_include_directories(lru_memory_manager PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>

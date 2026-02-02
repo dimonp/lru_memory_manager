@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.50)
 
-option(BUILD_TESTING "Build the project's tests" ON)
-option(ENABLE_SANITIZERS "Enable all sanitizers" ON)  
-option(ENABLE_EXCEPTIONS "Enable exceptions" OFF)
+option(LRUMM_BUILD_TESTING "Build the project's tests" ON)
+option(LRUMM_ENABLE_SANITIZERS "Enable all sanitizers" ON)  
+option(LRUMM_ENABLE_EXCEPTIONS "Enable exceptions" OFF)
 
-if(BUILD_TESTING)
+if(LRUMM_BUILD_TESTING)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
 endif()
 
@@ -17,7 +17,7 @@ project(lru_memory_manager VERSION 0.1 LANGUAGES CXX)
 
 add_library(lrumm_project_options INTERFACE IMPORTED)
 
-if (ENABLE_SANITIZERS)
+if (LRUMM_ENABLE_SANITIZERS)
   if(MSVC)
     target_compile_options(lrumm_project_options INTERFACE /fsanitize=address /Zi /INCREMENTAL:NO)
     target_link_options(lrumm_project_options INTERFACE /INCREMENTAL:NO)
@@ -28,7 +28,7 @@ if (ENABLE_SANITIZERS)
   endif()
 endif()
 
-if (ENABLE_EXCEPTIONS)
+if (LRUMM_ENABLE_EXCEPTIONS)
   if(MSVC)
     target_compile_options(quadtree_project_options INTERFACE /EHsc-)
     target_compile_options(quadtree_project_options INTERFACE /EHs-)
@@ -38,14 +38,14 @@ if (ENABLE_EXCEPTIONS)
   endif()
 endif()
 
-find_program(CLANGTIDY clang-tidy)
-if(CLANGTIDY)
+find_program(CLANGTIDY_FOUND clang-tidy)
+if(CLANGTIDY_FOUND)
   set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
 endif()
 
 add_subdirectory(src)
 
-if(BUILD_TESTING)
+if(LRUMM_BUILD_TESTING)
   add_subdirectory(benchmark)
   include(CTest)
   add_subdirectory(test)

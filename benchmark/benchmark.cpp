@@ -1,6 +1,6 @@
 #include <benchmark/benchmark.h>
 
-#include "lrumemorymanager.h"
+#include "lru_memory_manager/lrumemorymanager.h"
 #include <vector>
 #include <random>
 

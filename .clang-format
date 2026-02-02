@@ -4,7 +4,7 @@
 ---
 ### General config, applies to all languages ###
 # BasedOnStyle:  LLVM
-BasedOnStyle: Stroustrup
+BasedOnStyle: Chromium
 AccessModifierOffset: -4
 AlignAfterOpenBracket: DontAlign
 # AlignArrayOfStructures: None

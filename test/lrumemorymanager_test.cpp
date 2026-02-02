@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "lrumemorymanager.h"
+#include "lru_memory_manager/lrumemorymanager.h"
 
 #if defined(__has_feature)
 #  if __has_feature(address_sanitizer)

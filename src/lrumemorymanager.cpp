@@ -5,7 +5,7 @@
 
 #include <sanitizer/asan_interface.h>
 
-#include "lrumemorymanager.h"
+#include "lru_memory_manager/lrumemorymanager.h"
 
 namespace lrumm {
 

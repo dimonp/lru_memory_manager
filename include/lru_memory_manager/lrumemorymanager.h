@@ -11,7 +11,7 @@
 
 #ifndef LOG_INFO
 #define LOG_INFO(...) std::fprintf(stdout, __VA_ARGS__)
-#endif  
+#endif
 
 namespace lrumm {
 
@@ -39,7 +39,7 @@ public:
         void operator= (const LRUMemoryHandle& other) { Expects(other.hunk_ptr_ == nullptr); } // Copyable in initial state only.
         LRUMemoryHandle(LRUMemoryHandle&& other) { Expects(other.hunk_ptr_ == nullptr); } // Movable in initial state only.
         void operator= (LRUMemoryHandle&& other) { Expects(other.hunk_ptr_ == nullptr); } // Movable in initial state only.
-        ~LRUMemoryHandle() { if (hunk_ptr_) LRUMemoryManager::get_instance().free(this); };
+        ~LRUMemoryHandle() noexcept {if (hunk_ptr_) { LRUMemoryManager::get_instance().free(this); }};
 
         const LRUMemoryHunk* hunk_ptr() const { return hunk_ptr_; }
 

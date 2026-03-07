@@ -27,7 +27,7 @@
             "inherits": "core",
             "cacheVariables": {
                 "CMAKE_CXX_COMPILER": "cl",
-                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_BUILD_TYPE": "Release",
                 "LRUMM_ENABLE_SANITIZERS": "OFF"
             }
         },
@@ -49,7 +49,7 @@
             "inherits": "core",
             "cacheVariables": {
                 "CMAKE_CXX_COMPILER": "g++",
-                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_BUILD_TYPE": "Release",
                 "LRUMM_ENABLE_SANITIZERS": "OFF"
             }
         }

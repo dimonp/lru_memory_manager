@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.50)
 
+option(CMAKE_VERBOSE_MAKEFILE "Build the project's tests" ON)
 option(LRUMM_BUILD_TESTING "Build the project's tests" ON)
-option(LRUMM_ENABLE_SANITIZERS "Enable all sanitizers" ON)  
+option(LRUMM_ENABLE_SANITIZERS "Enable all sanitizers" ON)
 option(LRUMM_ENABLE_EXCEPTIONS "Enable exceptions" OFF)
 
 if(LRUMM_BUILD_TESTING)
@@ -10,10 +11,10 @@ endif()
 
 if (NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED True) 
+  set(CMAKE_CXX_STANDARD_REQUIRED True)
 endif()
 
-project(lru_memory_manager VERSION 0.1 LANGUAGES CXX)
+project(lru_memory_manager VERSION 0.2 LANGUAGES CXX)
 
 add_library(lrumm_project_options INTERFACE IMPORTED)
 
@@ -30,11 +31,11 @@ endif()
 
 if (LRUMM_ENABLE_EXCEPTIONS)
   if(MSVC)
-    target_compile_options(quadtree_project_options INTERFACE /EHsc-)
-    target_compile_options(quadtree_project_options INTERFACE /EHs-)
-    target_compile_definitions(quadtree_project_options INTERFACE _HAS_EXCEPTIONS=0)  
+    target_compile_options(lrumm_project_options INTERFACE /EHsc-)
+    target_compile_options(lrumm_project_options INTERFACE /EHs-)
+    target_compile_definitions(lrumm_project_options INTERFACE _HAS_EXCEPTIONS=0)
   else()
-    target_compile_options(quadtree_project_options INTERFACE -fno-exceptions)
+    target_compile_options(lrumm_project_options INTERFACE -fno-exceptions)
   endif()
 endif()
 
@@ -46,6 +47,7 @@ endif()
 add_subdirectory(src)
 
 if(LRUMM_BUILD_TESTING)
+  enable_testing()
   add_subdirectory(benchmark)
   include(CTest)
   add_subdirectory(test)

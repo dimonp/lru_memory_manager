@@ -6,17 +6,38 @@
 
 // Benchmark for allocating memory using 'alloc'
 static void BM_LRUAllocAllocation(benchmark::State& state) {
+    std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles;
+    handles.reserve(100000000);
+    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
+
+    size_t alloc_size = state.range(0);
+    for ([[maybe_unused]] auto _ : state) {
+        if (handles.size() == handles.capacity()) {
+            state.SkipWithError("Reached max iterations limit");
+            break;
+        }
+
+        auto& handle = handles.emplace_back();
+        manager.alloc(&handle, alloc_size);
+    }
+    state.SetBytesProcessed(int64_t(state.iterations()) * alloc_size);
+    state.SetLabel("alloc");
+
+    state.SetComplexityN(state.range(0));
+}
+
+static void BM_LRUAllocAllocationFree(benchmark::State& state) {
     lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
     lrumm::LRUMemoryManager::LRUMemoryHandle handle;
 
-    size_t size = state.range(0); // Get size from benchmark argument
+    size_t alloc_size = state.range(0); // Get size from benchmark argument
     for ([[maybe_unused]] auto _ : state) {
-        void* data = manager.alloc(&handle, size);
+        void* data = manager.alloc(&handle, alloc_size);
         benchmark::DoNotOptimize(data); // Prevent compiler from optimizing out allocation
         manager.free(&handle); // Deallocate memory
     }
-    state.SetBytesProcessed(int64_t(state.iterations()) * size);
-    state.SetLabel("alloc");
+    state.SetBytesProcessed(int64_t(state.iterations()) * alloc_size);
+    state.SetLabel("alloc_free");
 
     state.SetComplexityN(state.range(0));
 }
@@ -231,11 +252,42 @@ static void BM_LRUIterator(benchmark::State& state) {
     state.SetComplexityN(state.range(1));
 }
 
+static void BM_LRURandomAllocFree(benchmark::State& state) {
+    static constexpr size_t MIN_ALLOC = 128;
+    static constexpr size_t MAX_ALLOC = 4096;
+
+    std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles;
+    handles.resize(10000);
+
+    size_t arena_size = state.range(0) * 1024 * 1024;
+    lrumm::LRUMemoryManager manager(arena_size);
+
+    std::default_random_engine gen(42);
+    std::uniform_int_distribution<size_t> size_dist(MIN_ALLOC, MAX_ALLOC);
+    std::uniform_int_distribution<int> op_dist(0, 100);
+
+    for ([[maybe_unused]] auto _ : state) {
+        size_t idx = gen() % handles.size();
+        auto& handle = handles[idx];
+
+        if (op_dist(gen) < 80 && handle.hunk_ptr() == nullptr) {
+            size_t size = size_dist(gen);
+            manager.alloc(&handle, size);
+        } else {
+            manager.free(&handle);
+        }
+
+        benchmark::DoNotOptimize(manager);
+    }
+}
+
 BENCHMARK(BM_LRUAllocAllocation)->Range(8, 8 << 20)->Complexity();
+BENCHMARK(BM_LRUAllocAllocationFree)->Range(8, 8 << 20)->Complexity();
 BENCHMARK(BM_LRUGetBufferAndRefresh)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
 BENCHMARK(BM_LRUFree)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
 BENCHMARK(BM_LRUMixedWorkload)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
-BENCHMARK(BM_LRUEviction)->Ranges({{1024, 16 * 1024}, {32, 128}, {10, 100}})->Complexity();
+BENCHMARK(BM_LRUEviction)->Ranges({{4096, 16 * 4096}, {64, 256}, {10, 100}})->Complexity();
 BENCHMARK(BM_LRUIterator)->Ranges({{1, 1 << 10}, {64, 1 << 10}})->Complexity();
+BENCHMARK(BM_LRURandomAllocFree)->Ranges({{4, 256}});
 
 BENCHMARK_MAIN();

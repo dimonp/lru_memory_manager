@@ -1,6 +1,8 @@
 #ifndef LRU_MEMORY_MANAGER__H
 #define LRU_MEMORY_MANAGER__H
 
+#include <cstdint>
+#include <cassert>
 #include <iterator>
 #include <type_traits>
 #include <gsl/gsl>
@@ -35,52 +37,50 @@ public:
         LRUMemoryHandle() = default;
 
         // Should not be copying and moving after initialization
-        LRUMemoryHandle(const LRUMemoryHandle& other) { Expects(other.hunk_ptr_ == nullptr); } // Copyable in initial state only.
-        void operator= (const LRUMemoryHandle& other) { Expects(other.hunk_ptr_ == nullptr); } // Copyable in initial state only.
-        LRUMemoryHandle(LRUMemoryHandle&& other) { Expects(other.hunk_ptr_ == nullptr); } // Movable in initial state only.
-        void operator= (LRUMemoryHandle&& other) { Expects(other.hunk_ptr_ == nullptr); } // Movable in initial state only.
-        ~LRUMemoryHandle() noexcept {if (hunk_ptr_) { LRUMemoryManager::get_instance().free(this); }};
+        LRUMemoryHandle(const LRUMemoryHandle& other) { Expects(other.hunk_ == nullptr); } // Copyable in initial state only.
+        void operator= (const LRUMemoryHandle& other) { Expects(other.hunk_ == nullptr); } // Copyable in initial state only.
+        LRUMemoryHandle(LRUMemoryHandle&& other) { Expects(other.hunk_ == nullptr); } // Movable in initial state only.
+        void operator= (LRUMemoryHandle&& other) { Expects(other.hunk_ == nullptr); } // Movable in initial state only.
 
-        const LRUMemoryHunk* hunk_ptr() const { return hunk_ptr_; }
-
-        LRUMemoryHandle* next() const;
-        LRUMemoryHandle* most_recent() const;
-
+        const LRUMemoryHunk* hunk_ptr() const { return hunk_; }
         size_t size() const;
     private:
-        LRUMemoryHunk *hunk_ptr_ = nullptr;
+        LRUMemoryHunk *hunk_ = nullptr;
         friend LRUMemoryManager;
     };
 
     template<bool IsConst>
-    class Iterator {
+    class LruIterator {
     public:
-        using iterator_category = std::forward_iterator_tag;
-        using difference_type = std::ptrdiff_t;
-        using pointer = std::conditional_t<IsConst, const LRUMemoryHandle*, LRUMemoryHandle*>;
-        using reference = std::conditional_t<IsConst, const LRUMemoryHandle&, LRUMemoryHandle&>;
+        using iterator_category = std::bidirectional_iterator_tag;
+        using difference_type   = std::ptrdiff_t;
+        using pointer           = std::conditional_t<IsConst, const LRUMemoryHandle*, LRUMemoryHandle*>;
+        using reference         = std::conditional_t<IsConst, const LRUMemoryHandle&, LRUMemoryHandle&>;
 
-        explicit Iterator(pointer handle_ptr, bool is_lru_order = true)
-            : current_handle_ptr_(handle_ptr), is_lru_order_(is_lru_order) {}
+        explicit LruIterator(pointer handle_ptr, std::function<pointer(pointer)> get_next)
+            : current_handle_(handle_ptr), get_next_(get_next) {}
 
-        reference operator*() const { return *current_handle_ptr_; }
-        pointer operator->() const { return current_handle_ptr_; }
+        reference operator*() const { return *current_handle_; }
+        pointer operator->() const { return current_handle_; }
 
-        Iterator& operator++()
+        LruIterator& operator++()
         {
-            current_handle_ptr_ = is_lru_order_ ? current_handle_ptr_->most_recent() : current_handle_ptr_->next();
+            current_handle_ = get_next_(current_handle_);
             return *this;
         }
 
-        bool operator==(const Iterator& other) const { return current_handle_ptr_ == other.current_handle_ptr_; };
-        bool operator!=(const Iterator& other) const { return current_handle_ptr_ != other.current_handle_ptr_; };
+        bool operator==(const LruIterator& other) const { return current_handle_ == other.current_handle_; };
+        bool operator!=(const LruIterator& other) const { return current_handle_ != other.current_handle_; };
+
     private:
-        pointer current_handle_ptr_;
-        bool is_lru_order_;
+        std::function<pointer(pointer)> get_next_;
+        pointer current_handle_;
     };
 
-    using iterator = Iterator<false>;
-    using const_iterator = Iterator<true>;
+    const LruIterator<true> begin() const;
+    const LruIterator<true> end() const;
+    LruIterator<false> begin();
+    LruIterator<false> end();
 
     explicit LRUMemoryManager(size_t mem_pool_size = 4 * 1024 * 1024);
     ~LRUMemoryManager() noexcept;
@@ -88,71 +88,81 @@ public:
     LRUMemoryManager(const LRUMemoryManager&) = delete;
     LRUMemoryManager& operator=(const LRUMemoryManager&) = delete;
 
-    void* alloc(LRUMemoryHandle *handle_ptr, size_t size);
-    void free(LRUMemoryHandle *handle_ptr);
-    void* get_buffer_and_refresh(LRUMemoryHandle *handle_ptr);
+    void* alloc(LRUMemoryHandle *handle, size_t size);
+    void free(LRUMemoryHandle *handle);
+    void* get_buffer_and_refresh(LRUMemoryHandle *handle);
     void flush();
+    void arena_clean();
 
-    void report_state() const;
+    void lru_state() const;
     void debug_dump() const;
 
     size_t get_allocated_memory_size() const;
 
-    iterator begin(bool lru = true);
-    iterator end();
-    const_iterator begin(bool lru = true) const;
-    const_iterator end() const;
-
-    static LRUMemoryManager& get_instance();
-
 private:
-    LRUMemoryHunk* get_head_hunk() const;
+    struct ListLinks {
+        ListLinks *next;
+        ListLinks *prev;
+    };
+
+    void init_pool();
 
     LRUMemoryHunk* try_alloc(size_t size);
-    void* real_get_buffer(LRUMemoryHandle *handle_ptr);
-    void* real_alloc(LRUMemoryHandle *handle_ptr, size_t size);
-    void real_free(LRUMemoryHandle *handle_ptr);
+    void* real_get_buffer(LRUMemoryHandle *handle);
+    void* real_alloc(LRUMemoryHandle *handle, size_t size);
+    void real_free(LRUMemoryHandle *handle);
 
-    void unlink_lru(LRUMemoryHunk *hunk_ptr);
-    void link_lru(LRUMemoryHunk *hunk_ptr);
+    // Core allocation sub-steps
+    LRUMemoryHunk* find_free_block(size_t size);
+    void split_block(LRUMemoryHunk* hunk, size_t size);
+    void activate_lru_hunk(LRUMemoryHunk* hunk);
+
+    // Memory state management (Bitmap & Rings)
+    void add_to_free_list(LRUMemoryHunk* hunk);
+    void remove_from_free_list(LRUMemoryHunk* hunk);
+
+    LRUMemoryHunk* get_head_hunk() const;
+    static LRUMemoryHunk* to_hunk_from_free(ListLinks* l);
+    static LRUMemoryHunk* to_hunk_from_lru(ListLinks* l);
+
+    // Bitmap of non-empty bins for O(1) bin selection
+    uint32_t free_bin_mask_;
+    ListLinks* free_bins_;
+    ListLinks* lru_anchor_;
 
     size_t mem_total_size_;      ///< Total size of the memory pool
     size_t mem_allocated_size_;  ///< Currently allocated size
-    void* mem_arena_ptr_;         ///< Pointer to the memory pool
+    void* mem_arena_;         ///< Pointer to the memory pool
 };
 
 // Inline implementations
 inline
-LRUMemoryManager::LRUMemoryHunk*
-LRUMemoryManager::get_head_hunk() const
-{
-    return static_cast<LRUMemoryHunk*>(mem_arena_ptr_);
-}
-
-inline
 void*
-LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle_ptr)
+LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle)
 {
-    Expects(handle_ptr != nullptr);
-    return real_get_buffer(handle_ptr);
+    Ensures(handle != nullptr);
+    return real_get_buffer(handle);
 }
 
 inline
 void
-LRUMemoryManager::free(LRUMemoryHandle *handle_ptr)
+LRUMemoryManager::free(LRUMemoryHandle *handle)
 {
-    Expects(handle_ptr);
-    Expects(handle_ptr->hunk_ptr_); // LRUMemoryManager::free: not allocated.
-    real_free(handle_ptr);
+    if (!handle || !handle->hunk_ptr()) {
+        return;
+    }
+    Ensures(handle->hunk_ != nullptr);
+    real_free(handle);
 }
 
 inline
 void*
-LRUMemoryManager::alloc(LRUMemoryHandle *handle_ptr, size_t size)
+LRUMemoryManager::alloc(LRUMemoryHandle *handle, size_t size)
 {
-    Expects(size > 0);
-    Expects(handle_ptr != nullptr);
-    return real_alloc(handle_ptr, size);
+    Ensures(size > 0);
+    Ensures(handle != nullptr);
+    Ensures(handle->hunk_ == nullptr);
+    return real_alloc(handle, size);
 }
 
 inline
@@ -162,5 +172,6 @@ LRUMemoryManager::get_allocated_memory_size() const
     return mem_allocated_size_;
 }
 
-}
+} // namespace lrumm
+
 #endif // LRU_MEMORY_MANAGER__H

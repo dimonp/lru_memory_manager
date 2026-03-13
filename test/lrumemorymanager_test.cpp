@@ -251,6 +251,23 @@ TEST_F(LRUMemoryManagerTest, Flush)
     EXPECT_EQ(sut.begin(), sut.end()) << "Should be empty after flush.";
 }
 
+TEST_F(LRUMemoryManagerTest, ArenaClean)
+{
+    constexpr size_t kExpectedSize0 = 50, kExpectedSize1 = 150, kExpectedSize2 = 250;
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
+    lrumm::LRUMemoryManager sut(kPoolSize);
+
+    sut.alloc(&handle0, kExpectedSize0);
+    sut.alloc(&handle1, kExpectedSize1);
+    sut.alloc(&handle2, kExpectedSize2);
+
+    EXPECT_NE(sut.begin(), sut.end()) << "Should not be empty.";
+
+    sut.arena_clean();
+
+    EXPECT_EQ(sut.begin(), sut.end()) << "Should be empty after flush.";
+}
+
 TEST_F(LRUMemoryManagerTest, HandleMethods)
 {
     constexpr size_t kExpectedSize = 100;

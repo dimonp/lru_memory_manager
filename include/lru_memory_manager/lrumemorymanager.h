@@ -101,8 +101,8 @@ public:
 
 private:
     struct ListLinks {
-        ListLinks *next;
-        ListLinks *prev;
+        ListLinks *next = nullptr;
+        ListLinks *prev = nullptr;
     };
 
     void init_pool();

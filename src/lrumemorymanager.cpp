@@ -46,6 +46,11 @@ get_bin_index(size_t size) {
 
 struct LRUMemoryManager::LRUMemoryHunk
 {
+    LRUMemoryHunk() : size(0), handle(nullptr), phys_prev(nullptr), phys_next(nullptr) 
+    {
+        new (&free_links) ListLinks();
+    }
+
     ptrdiff_t size; // Positive = Free, Negative = Allocated
     LRUMemoryHandle *handle;
     LRUMemoryHunk *phys_prev, *phys_next;

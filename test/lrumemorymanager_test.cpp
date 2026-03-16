@@ -84,7 +84,6 @@ TEST_F(LRUMemoryManagerTest, AllocateThreeOrder)
     sut.alloc(&handle0, kExpectedSize0);
     sut.alloc(&handle1, kExpectedSize1);
     sut.alloc(&handle2, kExpectedSize2);
-    sut.lru_state();
 
     // order 0->1->2
     auto itr = sut.begin();

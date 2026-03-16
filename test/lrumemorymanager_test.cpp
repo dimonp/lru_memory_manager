@@ -81,13 +81,9 @@ TEST_F(LRUMemoryManagerTest, AllocateThreeOrder)
     lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
     lrumm::LRUMemoryManager sut(kPoolSize);
 
-    sut.debug_dump();
     sut.alloc(&handle0, kExpectedSize0);
-    sut.debug_dump();
     sut.alloc(&handle1, kExpectedSize1);
-    sut.debug_dump();
     sut.alloc(&handle2, kExpectedSize2);
-    sut.debug_dump();
     sut.lru_state();
 
     // order 0->1->2
@@ -353,9 +349,6 @@ TEST_F(LRUMemoryManagerTest, LruEvictionOrder)
     lrumm::LRUMemoryManager::LRUMemoryHandle handle5;
     void* ptr5 = sut.alloc(&handle5, kAllocateSize);
 
-    sut.debug_dump();
-    sut.lru_state();
-
     EXPECT_NE(ptr5, nullptr) << "New allocation should succeed.";
     EXPECT_EQ(handle1.hunk_ptr(), nullptr) << "Handle1 should have been evicted.";
     EXPECT_NE(handle2.hunk_ptr(), nullptr) << "Handle2 should not have been evicted.";
@@ -438,11 +431,7 @@ TEST_F(LRUMemoryManagerTest, AlignmentAndSizeRounding)
     // Test a range of sizes
     for (size_t request_size : {1, 10, 50, 63, 64, 65, 100, 127, 128, 200, 500, 1000}) {
         lrumm::LRUMemoryManager::LRUMemoryHandle handle;
-        sut.debug_dump();
-        sut.lru_state();
         void* ptr = sut.alloc(&handle, request_size);
-        sut.debug_dump();
-        sut.lru_state();
         ASSERT_NE(ptr, nullptr) << "Allocation failed for size " << request_size;
         size_t allocated_size = handle.size();
         EXPECT_GE(allocated_size, request_size) << "Allocated size smaller than requested for size " << request_size;

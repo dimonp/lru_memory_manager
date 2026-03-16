@@ -46,7 +46,8 @@ get_bin_index(size_t size) {
 
 struct LRUMemoryManager::LRUMemoryHunk
 {
-    LRUMemoryHunk() : size(0), handle(nullptr), phys_prev(nullptr), phys_next(nullptr) 
+    LRUMemoryHunk() noexcept
+        : size(0), handle(nullptr), phys_prev(nullptr), phys_next(nullptr) 
     {
         new (&free_links) ListLinks();
     }
@@ -65,14 +66,16 @@ struct LRUMemoryManager::LRUMemoryHunk
 
 inline
 LRUMemoryManager::LRUMemoryHunk*
-LRUMemoryManager::to_hunk_from_free(LRUMemoryManager::ListLinks* l) {
+LRUMemoryManager::to_hunk_from_free(LRUMemoryManager::ListLinks* l) noexcept
+{
     return reinterpret_cast<LRUMemoryManager::LRUMemoryHunk*>(
         reinterpret_cast<uint8_t*>(l) - offsetof(LRUMemoryManager::LRUMemoryHunk, free_links));
 }
 
 inline
 LRUMemoryManager::LRUMemoryHunk*
-LRUMemoryManager::to_hunk_from_lru(LRUMemoryManager::ListLinks* l) {
+LRUMemoryManager::to_hunk_from_lru(LRUMemoryManager::ListLinks* l) noexcept
+{
     return reinterpret_cast<LRUMemoryManager::LRUMemoryHunk*>(
         reinterpret_cast<uint8_t*>(l) - offsetof(LRUMemoryManager::LRUMemoryHunk, lru_links));
 }
@@ -193,7 +196,7 @@ LRUMemoryManager::get_head_hunk() const
  */
 inline
 LRUMemoryManager::LRUMemoryHunk*
-LRUMemoryManager::find_free_block(size_t size)
+LRUMemoryManager::find_free_block(size_t size) noexcept
 {
     // Mask out all bins smaller than requested
     uint32_t mask = free_bin_mask_ & (~0U << get_bin_index(size));
@@ -220,7 +223,7 @@ LRUMemoryManager::find_free_block(size_t size)
  */
 inline
 void
-LRUMemoryManager::split_block(LRUMemoryHunk* hunk, size_t size)
+LRUMemoryManager::split_block(LRUMemoryHunk* hunk, size_t size) noexcept
 {
     ASAN_UNPOISON_MEMORY_REGION(
         reinterpret_cast<uint8_t*>(hunk) + sizeof(LRUMemoryHunk),
@@ -255,7 +258,7 @@ LRUMemoryManager::split_block(LRUMemoryHunk* hunk, size_t size)
  */
 inline
 void
-LRUMemoryManager::activate_lru_hunk(LRUMemoryHunk* hunk)
+LRUMemoryManager::activate_lru_hunk(LRUMemoryHunk* hunk) noexcept
 {
     hunk->size = -std::abs(hunk->size); // Set size to negative (allocated marker)
 
@@ -271,7 +274,7 @@ LRUMemoryManager::activate_lru_hunk(LRUMemoryHunk* hunk)
 }
 
 LRUMemoryManager::LRUMemoryHunk*
-LRUMemoryManager::try_alloc(size_t size)
+LRUMemoryManager::try_alloc(size_t size) noexcept
 {
     LRUMemoryHunk* hunk = find_free_block(size);
     if (!hunk) {
@@ -287,7 +290,7 @@ LRUMemoryManager::try_alloc(size_t size)
 }
 
 void*
-LRUMemoryManager::real_get_buffer(LRUMemoryHandle *handle)
+LRUMemoryManager::real_get_buffer(LRUMemoryHandle *handle) noexcept
 {
     if (handle->hunk_ == nullptr) {
         return nullptr;
@@ -316,7 +319,7 @@ LRUMemoryManager::real_get_buffer(LRUMemoryHandle *handle)
 }
 
 void*
-LRUMemoryManager::real_alloc(LRUMemoryHandle *handle, size_t size)
+LRUMemoryManager::real_alloc(LRUMemoryHandle *handle, size_t size) noexcept
 {
     size_t aligned_size = align_up(size + sizeof(LRUMemoryHunk));
 
@@ -343,7 +346,7 @@ LRUMemoryManager::real_alloc(LRUMemoryHandle *handle, size_t size)
 
 inline
 void
-LRUMemoryManager::add_to_free_list(LRUMemoryHunk* hunk)
+LRUMemoryManager::add_to_free_list(LRUMemoryHunk* hunk) noexcept
 {
     // Put back to the appropriate free bin
     int bin = get_bin_index(static_cast<size_t>(hunk->size));
@@ -360,7 +363,8 @@ LRUMemoryManager::add_to_free_list(LRUMemoryHunk* hunk)
 
 inline
 void
-LRUMemoryManager::remove_from_free_list(LRUMemoryHunk* hunk) {
+LRUMemoryManager::remove_from_free_list(LRUMemoryHunk* hunk) noexcept
+{
     size_t bin_idx = get_bin_index(std::abs(hunk->size));
     ListLinks* target = &hunk->free_links;
 
@@ -375,7 +379,7 @@ LRUMemoryManager::remove_from_free_list(LRUMemoryHunk* hunk) {
 }
 
 void
-LRUMemoryManager::real_free(LRUMemoryHandle *handle)
+LRUMemoryManager::real_free(LRUMemoryHandle *handle) noexcept
 {
     LRUMemoryHunk* hunk = handle->hunk_;
 

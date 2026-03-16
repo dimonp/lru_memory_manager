@@ -88,9 +88,9 @@ public:
     LRUMemoryManager(const LRUMemoryManager&) = delete;
     LRUMemoryManager& operator=(const LRUMemoryManager&) = delete;
 
-    void* alloc(LRUMemoryHandle *handle, size_t size);
-    void free(LRUMemoryHandle *handle);
-    void* get_buffer_and_refresh(LRUMemoryHandle *handle);
+    void* alloc(LRUMemoryHandle *handle, size_t size) noexcept;
+    void free(LRUMemoryHandle *handle) noexcept;
+    void* get_buffer_and_refresh(LRUMemoryHandle *handle) noexcept;
     void flush();
     void arena_clean();
 
@@ -107,23 +107,23 @@ private:
 
     void init_pool();
 
-    LRUMemoryHunk* try_alloc(size_t size);
-    void* real_get_buffer(LRUMemoryHandle *handle);
-    void* real_alloc(LRUMemoryHandle *handle, size_t size);
-    void real_free(LRUMemoryHandle *handle);
+    LRUMemoryHunk* try_alloc(size_t size) noexcept;
+    void* real_get_buffer(LRUMemoryHandle *handle) noexcept;
+    void* real_alloc(LRUMemoryHandle *handle, size_t size) noexcept;
+    void real_free(LRUMemoryHandle *handle) noexcept;
 
     // Core allocation sub-steps
-    LRUMemoryHunk* find_free_block(size_t size);
-    void split_block(LRUMemoryHunk* hunk, size_t size);
-    void activate_lru_hunk(LRUMemoryHunk* hunk);
+    LRUMemoryHunk* find_free_block(size_t size) noexcept;
+    void split_block(LRUMemoryHunk* hunk, size_t size) noexcept;
+    void activate_lru_hunk(LRUMemoryHunk* hunk) noexcept;
 
     // Memory state management (Bitmap & Rings)
-    void add_to_free_list(LRUMemoryHunk* hunk);
-    void remove_from_free_list(LRUMemoryHunk* hunk);
+    void add_to_free_list(LRUMemoryHunk* hunk) noexcept;
+    void remove_from_free_list(LRUMemoryHunk* hunk) noexcept;
 
     LRUMemoryHunk* get_head_hunk() const;
-    static LRUMemoryHunk* to_hunk_from_free(ListLinks* l);
-    static LRUMemoryHunk* to_hunk_from_lru(ListLinks* l);
+    static LRUMemoryHunk* to_hunk_from_free(ListLinks* l) noexcept;
+    static LRUMemoryHunk* to_hunk_from_lru(ListLinks* l) noexcept;
 
     // Bitmap of non-empty bins for O(1) bin selection
     uint32_t free_bin_mask_;
@@ -138,7 +138,7 @@ private:
 // Inline implementations
 inline
 void*
-LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle)
+LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle) noexcept
 {
     Ensures(handle != nullptr);
     return real_get_buffer(handle);
@@ -146,7 +146,7 @@ LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle)
 
 inline
 void
-LRUMemoryManager::free(LRUMemoryHandle *handle)
+LRUMemoryManager::free(LRUMemoryHandle *handle) noexcept
 {
     if (!handle || !handle->hunk_ptr()) {
         return;
@@ -157,7 +157,7 @@ LRUMemoryManager::free(LRUMemoryHandle *handle)
 
 inline
 void*
-LRUMemoryManager::alloc(LRUMemoryHandle *handle, size_t size)
+LRUMemoryManager::alloc(LRUMemoryHandle *handle, size_t size) noexcept
 {
     Ensures(size > 0);
     Ensures(handle != nullptr);

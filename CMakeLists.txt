@@ -14,7 +14,7 @@ if (NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD_REQUIRED True)
 endif()
 
-project(lru_memory_manager VERSION 0.2 LANGUAGES CXX)
+project(lru_memory_manager VERSION 0.1.1 LANGUAGES CXX)
 
 add_library(lrumm_project_options INTERFACE IMPORTED)
 

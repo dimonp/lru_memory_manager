@@ -1,7 +1,6 @@
 #ifndef LRU_MEMORY_MANAGER__H
 #define LRU_MEMORY_MANAGER__H
 
-#include <cstdint>
 #include <cassert>
 #include <iterator>
 #include <type_traits>
@@ -43,6 +42,7 @@ public:
         void operator= (LRUMemoryHandle&& other) { Expects(other.hunk_ == nullptr); } // Movable in initial state only.
 
         const LRUMemoryHunk* hunk_ptr() const { return hunk_; }
+        LRUMemoryHandle* least_recent() const;
         size_t size() const;
     private:
         LRUMemoryHunk *hunk_ = nullptr;
@@ -57,15 +57,14 @@ public:
         using pointer           = std::conditional_t<IsConst, const LRUMemoryHandle*, LRUMemoryHandle*>;
         using reference         = std::conditional_t<IsConst, const LRUMemoryHandle&, LRUMemoryHandle&>;
 
-        explicit LruIterator(pointer handle_ptr, std::function<pointer(pointer)> get_next)
-            : current_handle_(handle_ptr), get_next_(get_next) {}
+        explicit LruIterator(pointer handle_ptr) : current_handle_(handle_ptr) {}
 
         reference operator*() const { return *current_handle_; }
         pointer operator->() const { return current_handle_; }
 
         LruIterator& operator++()
         {
-            current_handle_ = get_next_(current_handle_);
+            current_handle_ = current_handle_->least_recent();
             return *this;
         }
 
@@ -73,7 +72,6 @@ public:
         bool operator!=(const LruIterator& other) const { return current_handle_ != other.current_handle_; };
 
     private:
-        std::function<pointer(pointer)> get_next_;
         pointer current_handle_;
     };
 
@@ -100,69 +98,49 @@ public:
     size_t get_allocated_memory_size() const;
 
 private:
-    struct ListLinks {
-        ListLinks *next = nullptr;
-        ListLinks *prev = nullptr;
-    };
+    LRUMemoryHunk* get_head_hunk() const noexcept;
+
+    LRUMemoryHunk* try_alloc(size_t size) noexcept;
+    void* real_get_buffer(LRUMemoryHandle *handle_ptr) noexcept;
+    void* real_alloc(LRUMemoryHandle *handle_ptr, size_t size) noexcept;
+    void real_free(LRUMemoryHandle *handle_ptr) noexcept;
 
     void init_pool();
 
-    LRUMemoryHunk* try_alloc(size_t size) noexcept;
-    void* real_get_buffer(LRUMemoryHandle *handle) noexcept;
-    void* real_alloc(LRUMemoryHandle *handle, size_t size) noexcept;
-    void real_free(LRUMemoryHandle *handle) noexcept;
-
-    // Core allocation sub-steps
-    LRUMemoryHunk* find_free_block(size_t size) noexcept;
-    void split_block(LRUMemoryHunk* hunk, size_t size) noexcept;
-    void activate_lru_hunk(LRUMemoryHunk* hunk) noexcept;
-
-    // Memory state management (Bitmap & Rings)
-    void add_to_free_list(LRUMemoryHunk* hunk) noexcept;
-    void remove_from_free_list(LRUMemoryHunk* hunk) noexcept;
-
-    LRUMemoryHunk* get_head_hunk() const;
-    static LRUMemoryHunk* to_hunk_from_free(ListLinks* l) noexcept;
-    static LRUMemoryHunk* to_hunk_from_lru(ListLinks* l) noexcept;
-
-    // Bitmap of non-empty bins for O(1) bin selection
-    uint32_t free_bin_mask_;
-    ListLinks* free_bins_;
-    ListLinks* lru_anchor_;
+    LRUMemoryHunk* free_anchor_;
+    LRUMemoryHunk* lru_anchor_;
 
     size_t mem_total_size_;      ///< Total size of the memory pool
     size_t mem_allocated_size_;  ///< Currently allocated size
-    void* mem_arena_;         ///< Pointer to the memory pool
+    void* mem_pool_;         ///< Pointer to the memory pool
 };
 
 // Inline implementations
 inline
 void*
-LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle) noexcept
+LRUMemoryManager::get_buffer_and_refresh(LRUMemoryHandle *handle_ptr) noexcept
 {
-    Ensures(handle != nullptr);
-    return real_get_buffer(handle);
+    Ensures(handle_ptr != nullptr);
+    return real_get_buffer(handle_ptr);
 }
 
 inline
 void
-LRUMemoryManager::free(LRUMemoryHandle *handle) noexcept
+LRUMemoryManager::free(LRUMemoryHandle *handle_ptr) noexcept
 {
-    if (!handle || !handle->hunk_ptr()) {
+    if (!handle_ptr || !handle_ptr->hunk_ptr()) {
         return;
     }
-    Ensures(handle->hunk_ != nullptr);
-    real_free(handle);
+    real_free(handle_ptr);
 }
 
 inline
 void*
-LRUMemoryManager::alloc(LRUMemoryHandle *handle, size_t size) noexcept
+LRUMemoryManager::alloc(LRUMemoryHandle *handle_ptr, size_t size) noexcept
 {
     Ensures(size > 0);
-    Ensures(handle != nullptr);
-    Ensures(handle->hunk_ == nullptr);
-    return real_alloc(handle, size);
+    Ensures(handle_ptr != nullptr);
+    return real_alloc(handle_ptr, size);
 }
 
 inline

@@ -572,6 +572,31 @@ TEST_F(LRUMemoryManagerTest, MemoryExhaustionWithEviction)
     }
 }
 
+TEST_F(LRUMemoryManagerTest, HandleLeastRecent)
+{
+    lrumm::LRUMemoryManager sut(kPoolSize);
+    lrumm::LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3;
+
+    void* p1 = sut.alloc(&handle1, 100);
+    void* p2 = sut.alloc(&handle2, 100);
+    void* p3 = sut.alloc(&handle3, 100);
+    ASSERT_NE(p1, nullptr);
+    ASSERT_NE(p2, nullptr);
+    ASSERT_NE(p3, nullptr);
+
+    // In LRU order: handle1 (most recent) -> handle3 -> handle2 (least recent)
+    // Check least_recent for each handle
+    // least_recent() returns the handle that is less recent than this one (predecessor).
+    EXPECT_EQ(handle3.least_recent()->hunk_ptr(), handle2.hunk_ptr());
+    EXPECT_EQ(handle2.least_recent()->hunk_ptr(), handle1.hunk_ptr());
+    // handle1.least_recent() should return anchor (nullptr)
+    EXPECT_EQ(handle1.least_recent(), nullptr);
+
+    sut.free(&handle1);
+    sut.free(&handle2);
+    sut.free(&handle3);
+}
+
 #if defined(ASAN_ENABLED)
 
 // ASAN Positive Scenario Tests

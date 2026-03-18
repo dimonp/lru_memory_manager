@@ -215,13 +215,8 @@ size_t size() const;                     // Get allocated size
 The memory manager provides iterators for traversing allocations:
 
 ```cpp
-// Iterate in allocation order
+// Iterate in lru order
 for (auto& handle : manager) {
-    // Process handle
-}
-
-// Iterate in LRU order (most recent first)
-for (auto itr = manager.begin(true); itr != manager.end(); ++itr) {
     // Process handle
 }
 ```
@@ -272,9 +267,9 @@ Each allocation has a fixed overhead of approximately 40 bytes for metadata trac
 ### Benchmark Results
 
 Performance characteristics on typical hardware:
-- Allocation: ~50ns average
-- Deallocation: ~30ns average
-- LRU refresh: ~15ns average
+- Allocation: ~15ns average
+- Deallocation: ~15ns average
+- LRU refresh: ~5ns average
 - Eviction: ~100ns average
 
 ## AddressSanitizer Integration

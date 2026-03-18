@@ -1,5 +1,3 @@
-#include <cstdlib>
-#include <cstring>
 #include <climits>
 #include <new>
 
@@ -9,21 +7,21 @@
 
 namespace lrumm {
 
-static constexpr size_t MINIMUM_ALLOCATE_BLOCK = 64;
-static constexpr size_t ALLOCATED_BLOCK_ALIGNMENT = 64;
-static constexpr size_t NUMBER_OF_BINS = 32;
+inline constexpr size_t MINIMUM_ALLOCATE_BLOCK = 64;
+inline constexpr size_t NUMBER_OF_BINS = 32;
 
 inline
 size_t
-align_up(size_t size)
+align_up(size_t size) noexcept
 {
-    // Align size to ALLOCATED_BLOCK_ALIGNMENT boundary
-    return (size + (ALLOCATED_BLOCK_ALIGNMENT - 1)) & ~(ALLOCATED_BLOCK_ALIGNMENT - 1);
+    // Align size to BLOCK_ALIGNMENT boundary
+    return (size + (LRUMemoryManager::BLOCK_ALIGNMENT - 1)) & ~(LRUMemoryManager::BLOCK_ALIGNMENT - 1);
 }
 
 inline
 int
-portable_ctz(unsigned int x) {
+portable_ctz(unsigned int x) noexcept
+{
     if (x == 0) {
         return sizeof(unsigned int) * CHAR_BIT;
     }
@@ -39,32 +37,33 @@ portable_ctz(unsigned int x) {
 
 inline
 size_t
-get_bin_index(size_t size) {
-    // 64 -> 0, 128 -> 1, 512 -> 4, 1024 -> 8, 2048б -> 16
+get_bin_index(size_t size) noexcept
+{
+    // 64 -> 0, 128 -> 1, 512 -> 4, 1024 -> 8, 2048 -> 16
     uint32_t idx = static_cast<uint32_t>(size >> 7);
-    return (idx > 31) ? 31 : static_cast<int>(idx);}
+    return (idx > 31) ? 31 : static_cast<int>(idx);
+}
 
 struct LRUMemoryManager::LRUMemoryHunk
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     LRUMemoryHunk() noexcept
-        : size(0), handle(nullptr), phys_prev(nullptr), phys_next(nullptr) 
     {
         new (&free_links) ListLinks();
     }
 
-    ptrdiff_t size; // Positive = Free, Negative = Allocated
-    LRUMemoryHandle *handle;
-    LRUMemoryHunk *phys_prev, *phys_next;
+    ptrdiff_t size = 0; // Positive = Free, Negative = Allocated
+    LRUMemoryHandle *handle = nullptr;
+    LRUMemoryHunk *phys_prev = nullptr, *phys_next = nullptr;
 
     union {
-        struct { ListLinks free_links; };
-        struct { ListLinks lru_links; };
+        ListLinks free_links;
+        ListLinks lru_links;
     };
 
     uint8_t data_ptr[];
 };
 
-inline
 LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::to_hunk_from_free(LRUMemoryManager::ListLinks* l) noexcept
 {
@@ -72,7 +71,6 @@ LRUMemoryManager::to_hunk_from_free(LRUMemoryManager::ListLinks* l) noexcept
         reinterpret_cast<uint8_t*>(l) - offsetof(LRUMemoryManager::LRUMemoryHunk, free_links));
 }
 
-inline
 LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::to_hunk_from_lru(LRUMemoryManager::ListLinks* l) noexcept
 {
@@ -99,7 +97,7 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
 
     free_bins_ = new ListLinks[NUMBER_OF_BINS];
     lru_anchor_ = new ListLinks();
-    mem_arena_ = std::malloc(mem_total_size_);
+    mem_arena_ = new char[mem_total_size_];
     if (!mem_arena_) {
         LOG_ERROR("Failed to allocate memory pool of size %zu.\n", mem_pool_size);
         std::terminate();
@@ -124,15 +122,14 @@ LRUMemoryManager::~LRUMemoryManager() noexcept
         static_cast<size_t>(head_hunk->size) - sizeof(LRUMemoryHunk)
     );
 
-    std::free(mem_arena_);
+    delete [] mem_arena_;
     delete[] free_bins_;
     delete lru_anchor_;
 }
 
-void LRUMemoryManager::init_pool()
+void 
+LRUMemoryManager::init_pool()
 {
-    uint8_t* ptr = static_cast<uint8_t*>(mem_arena_);
-
     // Initialize free bins as circular rings
     for (size_t i = 0; i < NUMBER_OF_BINS; ++i) {
         free_bins_[i].next = &free_bins_[i];
@@ -183,9 +180,8 @@ LRUMemoryManager::arena_clean()
     init_pool();
 }
 
-inline
 LRUMemoryManager::LRUMemoryHunk*
-LRUMemoryManager::get_head_hunk() const
+LRUMemoryManager::get_head_hunk() const noexcept
 {
     return reinterpret_cast<LRUMemoryHunk*>(mem_arena_);
 }
@@ -194,7 +190,6 @@ LRUMemoryManager::get_head_hunk() const
  * Searches for a block using bitwise operations on the bin mask.
  * This is the "Hot Path" of the allocator.
  */
-inline
 LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::find_free_block(size_t size) noexcept
 {
@@ -221,7 +216,6 @@ LRUMemoryManager::find_free_block(size_t size) noexcept
 /**
  * Splits a free block into two if the remainder is at least 128 bytes.
  */
-inline
 void
 LRUMemoryManager::split_block(LRUMemoryHunk* hunk, size_t size) noexcept
 {
@@ -256,12 +250,9 @@ LRUMemoryManager::split_block(LRUMemoryHunk* hunk, size_t size) noexcept
 /**
  * Moves a block to the "Most Recent" position in the LRU ring.
  */
-inline
 void
 LRUMemoryManager::activate_lru_hunk(LRUMemoryHunk* hunk) noexcept
 {
-    hunk->size = -std::abs(hunk->size); // Set size to negative (allocated marker)
-
     // Prepare the links
     ListLinks* target = &hunk->lru_links;
     ListLinks* anchor = lru_anchor_;
@@ -284,6 +275,7 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
     remove_from_free_list(hunk);
     split_block(hunk, size);
     activate_lru_hunk(hunk);
+    hunk->size = -std::abs(hunk->size); // Set size to negative (allocated marker)
     mem_allocated_size_ += std::abs(hunk->size);
 
     return hunk;
@@ -344,7 +336,6 @@ LRUMemoryManager::real_alloc(LRUMemoryHandle *handle, size_t size) noexcept
     return nullptr;
 }
 
-inline
 void
 LRUMemoryManager::add_to_free_list(LRUMemoryHunk* hunk) noexcept
 {
@@ -361,18 +352,17 @@ LRUMemoryManager::add_to_free_list(LRUMemoryHunk* hunk) noexcept
     free_bin_mask_ |= (1U << bin);
 }
 
-inline
 void
 LRUMemoryManager::remove_from_free_list(LRUMemoryHunk* hunk) noexcept
 {
-    size_t bin_idx = get_bin_index(std::abs(hunk->size));
+    const size_t bin_idx = get_bin_index(std::abs(hunk->size));
     ListLinks* target = &hunk->free_links;
 
     // remove from free ring
     target->prev->next = target->next;
     target->next->prev = target->prev;
 
-    // Если после удаления корзина стала пустой (кольцо замкнулось на якоре)
+    // If after removal the bin becomes empty (the ring is closed on the anchor)
     if (free_bins_[bin_idx].next == &free_bins_[bin_idx]) {
         free_bin_mask_ &= ~(1U << bin_idx);
     }

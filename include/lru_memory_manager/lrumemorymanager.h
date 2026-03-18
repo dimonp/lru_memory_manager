@@ -25,6 +25,8 @@ namespace lrumm {
  */
 class LRUMemoryManager {
 public:
+    static constexpr size_t BLOCK_ALIGNMENT = 64;
+
     struct LRUMemoryHunk;
 
     /**
@@ -107,32 +109,33 @@ private:
 
     void init_pool();
 
-    LRUMemoryHunk* try_alloc(size_t size) noexcept;
     void* real_get_buffer(LRUMemoryHandle *handle) noexcept;
     void* real_alloc(LRUMemoryHandle *handle, size_t size) noexcept;
     void real_free(LRUMemoryHandle *handle) noexcept;
 
     // Core allocation sub-steps
-    LRUMemoryHunk* find_free_block(size_t size) noexcept;
-    void split_block(LRUMemoryHunk* hunk, size_t size) noexcept;
-    void activate_lru_hunk(LRUMemoryHunk* hunk) noexcept;
+    inline LRUMemoryHunk* find_free_block(size_t size) noexcept;
+    inline void split_block(LRUMemoryHunk* hunk, size_t size) noexcept;
+    inline void activate_lru_hunk(LRUMemoryHunk* hunk) noexcept;
+    inline LRUMemoryHunk* try_alloc(size_t size) noexcept;
 
     // Memory state management (Bitmap & Rings)
-    void add_to_free_list(LRUMemoryHunk* hunk) noexcept;
-    void remove_from_free_list(LRUMemoryHunk* hunk) noexcept;
+    inline void add_to_free_list(LRUMemoryHunk* hunk) noexcept;
+    inline void remove_from_free_list(LRUMemoryHunk* hunk) noexcept;
 
-    LRUMemoryHunk* get_head_hunk() const;
-    static LRUMemoryHunk* to_hunk_from_free(ListLinks* l) noexcept;
-    static LRUMemoryHunk* to_hunk_from_lru(ListLinks* l) noexcept;
+    inline LRUMemoryHunk* get_head_hunk() const noexcept;
+    inline static LRUMemoryHunk* to_hunk_from_free(ListLinks* l) noexcept;
+    inline static LRUMemoryHunk* to_hunk_from_lru(ListLinks* l) noexcept;
 
     // Bitmap of non-empty bins for O(1) bin selection
     uint32_t free_bin_mask_;
     ListLinks* free_bins_;
     ListLinks* lru_anchor_;
 
+    alignas(BLOCK_ALIGNMENT) char* mem_arena_;
+
     size_t mem_total_size_;      ///< Total size of the memory pool
     size_t mem_allocated_size_;  ///< Currently allocated size
-    void* mem_arena_;         ///< Pointer to the memory pool
 };
 
 // Inline implementations

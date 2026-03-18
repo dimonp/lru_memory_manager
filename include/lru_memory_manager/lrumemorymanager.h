@@ -24,6 +24,9 @@ namespace lrumm {
  */
 class LRUMemoryManager {
 public:
+    static constexpr size_t MINIMUM_ALLOCATE_BLOCK = 64;
+    static constexpr size_t BLOCK_ALIGNMENT = 64;
+
     struct LRUMemoryHunk;
 
     /**
@@ -42,9 +45,10 @@ public:
         void operator= (LRUMemoryHandle&& other) { Expects(other.hunk_ == nullptr); } // Movable in initial state only.
 
         const LRUMemoryHunk* hunk_ptr() const { return hunk_; }
-        LRUMemoryHandle* least_recent() const;
         size_t size() const;
     private:
+        LRUMemoryHandle* least_recent() const;
+
         LRUMemoryHunk *hunk_ = nullptr;
         friend LRUMemoryManager;
     };
@@ -98,21 +102,20 @@ public:
     size_t get_allocated_memory_size() const;
 
 private:
-    LRUMemoryHunk* get_head_hunk() const noexcept;
-
-    LRUMemoryHunk* try_alloc(size_t size) noexcept;
+    inline LRUMemoryHunk* get_head_hunk() const noexcept;
+    inline LRUMemoryHunk* try_alloc(size_t size) noexcept;
     void* real_get_buffer(LRUMemoryHandle *handle_ptr) noexcept;
     void* real_alloc(LRUMemoryHandle *handle_ptr, size_t size) noexcept;
     void real_free(LRUMemoryHandle *handle_ptr) noexcept;
 
     void init_pool();
 
-    LRUMemoryHunk* free_anchor_;
-    LRUMemoryHunk* lru_anchor_;
+    alignas(BLOCK_ALIGNMENT) LRUMemoryHunk* free_anchor_;
+    alignas(BLOCK_ALIGNMENT) LRUMemoryHunk* lru_anchor_;
+    alignas(BLOCK_ALIGNMENT) char* mem_pool_;
 
     size_t mem_total_size_;      ///< Total size of the memory pool
     size_t mem_allocated_size_;  ///< Currently allocated size
-    void* mem_pool_;         ///< Pointer to the memory pool
 };
 
 // Inline implementations

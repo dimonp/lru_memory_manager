@@ -9,14 +9,11 @@
 
 namespace lrumm {
 
-static constexpr size_t MINIMUM_ALLOCATE_BLOCK = 64;
-static constexpr size_t ALLOCATED_BLOCK_ALIGNMENT = 64;
-
 inline
 size_t
 align_up(size_t size) {
     // Align size to ALLOCATED_BLOCK_ALIGNMENT boundary
-    return (size + (ALLOCATED_BLOCK_ALIGNMENT - 1)) & ~(ALLOCATED_BLOCK_ALIGNMENT - 1);
+    return (size + (LRUMemoryManager::BLOCK_ALIGNMENT - 1)) & ~(LRUMemoryManager::BLOCK_ALIGNMENT - 1);
 }
 
 inline int portable_clz(uint32_t x) {
@@ -49,14 +46,16 @@ get_bin_index(size_t size)
 }
 
 struct LRUMemoryManager::LRUMemoryHunk {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     LRUMemoryHunk() noexcept
-        : size(0), handle(nullptr), phys_prev(nullptr), phys_next(nullptr) 
-    { }
+    { 
+        free_next = nullptr;
+        free_prev = nullptr;
+    }
 
-
-    ptrdiff_t size; // Positive = Free, Negative = Allocated
-    LRUMemoryHandle *handle;
-    LRUMemoryHunk *phys_prev, *phys_next;
+    ptrdiff_t size = 0; // Positive = Free, Negative = Allocated
+    LRUMemoryHandle *handle = nullptr;
+    LRUMemoryHunk *phys_prev = nullptr, *phys_next = nullptr;
 
     union {
         struct { LRUMemoryHunk *free_next, *free_prev; };
@@ -89,7 +88,7 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
 {
     assert(mem_pool_size > 0);
 
-    mem_pool_ = std::malloc(mem_total_size_);
+    mem_pool_ = new char[mem_total_size_];
     if (!mem_pool_) {
         LOG_ERROR("Failed to allocate memory pool of size %zu.\n", mem_pool_size);
         std::abort();
@@ -102,18 +101,18 @@ LRUMemoryManager::~LRUMemoryManager() noexcept
     flush();
 
     // Unpoison before deallocation to avoid false positives during potential internal checks
-    uint8_t* ptr = static_cast<uint8_t*>(mem_pool_) + sizeof(LRUMemoryHunk) * 2;
+    char* ptr = mem_pool_ + sizeof(LRUMemoryHunk) * 2;
     LRUMemoryHunk* first = reinterpret_cast<LRUMemoryHunk*>(ptr);
 
     ASAN_UNPOISON_MEMORY_REGION(
         reinterpret_cast<uint8_t*>(first) + sizeof(LRUMemoryHunk),
         first->size - sizeof(LRUMemoryHunk)
     );
-    std::free(mem_pool_);
+    delete [] mem_pool_;
 }
 
 void LRUMemoryManager::init_pool() {
-    uint8_t* ptr = static_cast<uint8_t*>(mem_pool_);
+    char* ptr = mem_pool_;
 
     // Place sentinels at the start of the arena
     free_anchor_ = new (ptr) LRUMemoryHunk {};
@@ -135,7 +134,7 @@ void LRUMemoryManager::init_pool() {
     lru_anchor_->phys_prev = nullptr;
 
     // Initial big free block
-    size_t header_offset = ptr - static_cast<uint8_t*>(mem_pool_);
+    size_t header_offset = ptr - mem_pool_;
     LRUMemoryHunk* first_hunk = new (ptr) LRUMemoryHunk {};
     first_hunk->size = static_cast<ptrdiff_t>(mem_total_size_ - header_offset);
     first_hunk->phys_next = nullptr;
@@ -171,7 +170,6 @@ LRUMemoryManager::arena_clean()
     init_pool();
 }
 
-inline
 LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::get_head_hunk() const noexcept
 {
@@ -182,30 +180,33 @@ LRUMemoryManager::get_head_hunk() const noexcept
 LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::try_alloc(size_t size) noexcept
 {
-    for (LRUMemoryHunk* current_free = free_anchor_->free_next; current_free != free_anchor_; current_free = current_free->free_next) {
-        if (current_free->size >= (ptrdiff_t)size) {
+    for (LRUMemoryHunk* current = free_anchor_->free_next; 
+        current != free_anchor_; 
+        current = current->free_next) {
+            
+        if (current->size >= (ptrdiff_t)size) {
 
             ASAN_UNPOISON_MEMORY_REGION(
-                reinterpret_cast<uint8_t*>(current_free) + sizeof(LRUMemoryHunk),
-                std::abs(current_free->size) - sizeof(LRUMemoryHunk)
+                reinterpret_cast<uint8_t*>(current) + sizeof(LRUMemoryHunk),
+                std::abs(current->size) - sizeof(LRUMemoryHunk)
             );
 
             // Splitting
-            if (current_free->size >= (ptrdiff_t)(size + MINIMUM_ALLOCATE_BLOCK)) {
-                LRUMemoryHunk* remain = new (reinterpret_cast<uint8_t*>(current_free) + size) LRUMemoryHunk {};
+            if (current->size >= (ptrdiff_t)(size + MINIMUM_ALLOCATE_BLOCK)) {
+                LRUMemoryHunk* remain = new (reinterpret_cast<uint8_t*>(current) + size) LRUMemoryHunk {};
 
-                remain->size = current_free->size - size;
-                current_free->size = (ptrdiff_t)size;
+                remain->size = current->size - size;
+                current->size = (ptrdiff_t)size;
 
-                remain->phys_next = current_free->phys_next;
-                remain->phys_prev = current_free;
-                if (current_free->phys_next) {
-                    current_free->phys_next->phys_prev = remain;
+                remain->phys_next = current->phys_next;
+                remain->phys_prev = current;
+                if (current->phys_next) {
+                    current->phys_next->phys_prev = remain;
                 }
-                current_free->phys_next = remain;
+                current->phys_next = remain;
 
-                remain->free_next = current_free->free_next;
-                remain->free_prev = current_free->free_prev;
+                remain->free_next = current->free_next;
+                remain->free_prev = current->free_prev;
                 remain->free_next->free_prev = remain;
                 remain->free_prev->free_next = remain;
 
@@ -215,21 +216,20 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
                     static_cast<size_t>(remain->size) - sizeof(LRUMemoryHunk)
                 );
             } else {
-                current_free->free_prev->free_next = current_free->free_next;
-                current_free->free_next->free_prev = current_free->free_prev;
+                current->free_prev->free_next = current->free_next;
+                current->free_next->free_prev = current->free_prev;
             }
 
-            current_free->size = -current_free->size;
-
             // Insert into LRU ring (Most Recent position)
-            current_free->least_recent = lru_anchor_->least_recent;
-            current_free->most_recent = lru_anchor_;
-            lru_anchor_->least_recent->most_recent = current_free;
-            lru_anchor_->least_recent = current_free;
+            current->least_recent = lru_anchor_->least_recent;
+            current->most_recent = lru_anchor_;
+            lru_anchor_->least_recent->most_recent = current;
+            lru_anchor_->least_recent = current;
 
-            mem_allocated_size_ += -current_free->size;
+            current->size = -std::abs(current->size);
+            mem_allocated_size_ += std::abs(current->size);
 
-            return current_free;
+            return current;
         }
     }
     return nullptr;

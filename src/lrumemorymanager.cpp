@@ -46,15 +46,9 @@ get_bin_index(size_t size) noexcept
 
 struct LRUMemoryManager::LRUMemoryHunk
 {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    LRUMemoryHunk() noexcept
-    {
-        new (&free_links) ListLinks();
-    }
-
-    ptrdiff_t size = 0; // Positive = Free, Negative = Allocated
-    LRUMemoryHandle *handle = nullptr;
-    LRUMemoryHunk *phys_prev = nullptr, *phys_next = nullptr;
+    ptrdiff_t size; // Positive = Free, Negative = Allocated
+    LRUMemoryHandle *handle;
+    LRUMemoryHunk *phys_prev, *phys_next;
 
     union {
         ListLinks free_links;
@@ -141,7 +135,7 @@ LRUMemoryManager::init_pool()
     lru_anchor_->prev = lru_anchor_;
 
     // Create the initial large free block
-    LRUMemoryHunk* first_hunk = new (mem_arena_) LRUMemoryHunk {};
+    LRUMemoryHunk* first_hunk = reinterpret_cast<LRUMemoryHunk*>(mem_arena_);
     first_hunk->size = static_cast<ptrdiff_t>(mem_total_size_);
     // Physical boundaries
     first_hunk->phys_next = nullptr;

@@ -46,16 +46,9 @@ get_bin_index(size_t size)
 }
 
 struct LRUMemoryManager::LRUMemoryHunk {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    LRUMemoryHunk() noexcept
-    { 
-        free_next = nullptr;
-        free_prev = nullptr;
-    }
-
-    ptrdiff_t size = 0; // Positive = Free, Negative = Allocated
-    LRUMemoryHandle *handle = nullptr;
-    LRUMemoryHunk *phys_prev = nullptr, *phys_next = nullptr;
+    ptrdiff_t size; // Positive = Free, Negative = Allocated
+    LRUMemoryHandle *handle;
+    LRUMemoryHunk *phys_prev, *phys_next;
 
     union {
         struct { LRUMemoryHunk *free_next, *free_prev; };
@@ -115,9 +108,9 @@ void LRUMemoryManager::init_pool() {
     char* ptr = mem_pool_;
 
     // Place sentinels at the start of the arena
-    free_anchor_ = new (ptr) LRUMemoryHunk {};
+    free_anchor_ = reinterpret_cast<LRUMemoryHunk*>(ptr);
     ptr += sizeof(LRUMemoryHunk);
-    lru_anchor_  = new (ptr) LRUMemoryHunk {};
+    lru_anchor_  = reinterpret_cast<LRUMemoryHunk*>(ptr);
     ptr += sizeof(LRUMemoryHunk);
 
     // Init circular sentinels
@@ -135,7 +128,7 @@ void LRUMemoryManager::init_pool() {
 
     // Initial big free block
     size_t header_offset = ptr - mem_pool_;
-    LRUMemoryHunk* first_hunk = new (ptr) LRUMemoryHunk {};
+    LRUMemoryHunk* first_hunk = reinterpret_cast<LRUMemoryHunk*>(ptr);
     first_hunk->size = static_cast<ptrdiff_t>(mem_total_size_ - header_offset);
     first_hunk->phys_next = nullptr;
     first_hunk->phys_prev = nullptr;
@@ -193,7 +186,7 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
 
             // Splitting
             if (current->size >= (ptrdiff_t)(size + MINIMUM_ALLOCATE_BLOCK)) {
-                LRUMemoryHunk* remain = new (reinterpret_cast<uint8_t*>(current) + size) LRUMemoryHunk {};
+                LRUMemoryHunk* remain = reinterpret_cast<LRUMemoryHunk*>(reinterpret_cast<uint8_t*>(current) + size);
 
                 remain->size = current->size - size;
                 current->size = (ptrdiff_t)size;

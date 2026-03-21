@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
-#include <new>
 
 #include <sanitizer/asan_interface.h>
 
@@ -173,59 +172,65 @@ LRUMemoryManager::get_head_hunk() const noexcept
 LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::try_alloc(size_t size) noexcept
 {
-    for (LRUMemoryHunk* current = free_anchor_->free_next; 
-        current != free_anchor_; 
-        current = current->free_next) {
-            
-        if (current->size >= (ptrdiff_t)size) {
+    LRUMemoryHunk* found = nullptr;
+    const ptrdiff_t target_size = (ptrdiff_t)size;
 
-            ASAN_UNPOISON_MEMORY_REGION(
-                reinterpret_cast<uint8_t*>(current) + sizeof(LRUMemoryHunk),
-                std::abs(current->size) - sizeof(LRUMemoryHunk)
-            );
+    for (LRUMemoryHunk* current = free_anchor_->free_next;
+         current != free_anchor_;
+         current = current->free_next) {
 
-            // Splitting
-            if (current->size >= (ptrdiff_t)(size + MINIMUM_ALLOCATE_BLOCK)) {
-                LRUMemoryHunk* remain = reinterpret_cast<LRUMemoryHunk*>(reinterpret_cast<uint8_t*>(current) + size);
-
-                remain->size = current->size - size;
-                current->size = (ptrdiff_t)size;
-
-                remain->phys_next = current->phys_next;
-                remain->phys_prev = current;
-                if (current->phys_next) {
-                    current->phys_next->phys_prev = remain;
-                }
-                current->phys_next = remain;
-
-                remain->free_next = current->free_next;
-                remain->free_prev = current->free_prev;
-                remain->free_next->free_prev = remain;
-                remain->free_prev->free_next = remain;
-
-                // poison remain free
-                ASAN_POISON_MEMORY_REGION(
-                    reinterpret_cast<uint8_t*>(remain) + sizeof(LRUMemoryHunk),
-                    static_cast<size_t>(remain->size) - sizeof(LRUMemoryHunk)
-                );
-            } else {
-                current->free_prev->free_next = current->free_next;
-                current->free_next->free_prev = current->free_prev;
-            }
-
-            // Insert into LRU ring (Most Recent position)
-            current->least_recent = lru_anchor_->least_recent;
-            current->most_recent = lru_anchor_;
-            lru_anchor_->least_recent->most_recent = current;
-            lru_anchor_->least_recent = current;
-
-            current->size = -std::abs(current->size);
-            mem_allocated_size_ += std::abs(current->size);
-
-            return current;
+        if (current->size >= target_size) {
+            found = current;
+            break; // Free space found
         }
     }
-    return nullptr;
+
+    if (!found) { return nullptr; }
+
+    ASAN_UNPOISON_MEMORY_REGION(
+        reinterpret_cast<uint8_t*>(found) + sizeof(LRUMemoryHunk),
+        std::abs(found->size) - sizeof(LRUMemoryHunk)
+    );
+
+    // Splitting
+    if (found->size >= (ptrdiff_t)(size + MINIMUM_ALLOCATE_BLOCK)) {
+        LRUMemoryHunk* remain = reinterpret_cast<LRUMemoryHunk*>(reinterpret_cast<uint8_t*>(found) + size);
+
+        remain->size = found->size - size;
+        found->size = (ptrdiff_t)size;
+
+        remain->phys_next = found->phys_next;
+        remain->phys_prev = found;
+        if (found->phys_next) {
+            found->phys_next->phys_prev = remain;
+        }
+        found->phys_next = remain;
+
+        remain->free_next = found->free_next;
+        remain->free_prev = found->free_prev;
+        remain->free_next->free_prev = remain;
+        remain->free_prev->free_next = remain;
+
+        // poison remain free
+        ASAN_POISON_MEMORY_REGION(
+            reinterpret_cast<uint8_t*>(remain) + sizeof(LRUMemoryHunk),
+            static_cast<size_t>(remain->size) - sizeof(LRUMemoryHunk)
+        );
+    } else {
+        found->free_prev->free_next = found->free_next;
+        found->free_next->free_prev = found->free_prev;
+    }
+
+    // Insert into LRU ring (Most Recent position)
+    found->least_recent = lru_anchor_->least_recent;
+    found->most_recent = lru_anchor_;
+    lru_anchor_->least_recent->most_recent = found;
+    lru_anchor_->least_recent = found;
+
+    found->size = -std::abs(found->size);
+    mem_allocated_size_ += std::abs(found->size);
+
+    return found;
 }
 
 void*

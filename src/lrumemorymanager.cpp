@@ -44,6 +44,7 @@ get_bin_index(size_t size) noexcept
     return (idx > 31) ? 31 : static_cast<int>(idx);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct LRUMemoryManager::LRUMemoryHunk
 {
     ptrdiff_t size; // Positive = Free, Negative = Allocated
@@ -121,7 +122,7 @@ LRUMemoryManager::~LRUMemoryManager() noexcept
     delete lru_anchor_;
 }
 
-void 
+void
 LRUMemoryManager::init_pool()
 {
     // Initialize free bins as circular rings
@@ -188,12 +189,12 @@ LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::find_free_block(size_t size) noexcept
 {
     // Mask out all bins smaller than requested
-    uint32_t mask = free_bin_mask_ & (~0U << get_bin_index(size));
+    const uint32_t mask = free_bin_mask_ & (~0U << get_bin_index(size));
     if (!mask) { return nullptr; }
 
     // Jump directly to the first non-empty bin index
-    int bin_idx = portable_ctz(mask);
-    ListLinks* anchor = &free_bins_[bin_idx];
+    const int bin_idx = portable_ctz(mask);
+    const ListLinks* anchor = &free_bins_[bin_idx];
 
     // In 99% of cases we take the FIRST block from the first bin we find
     LRUMemoryHunk* hunk = to_hunk_from_free(anchor->next);
@@ -334,7 +335,7 @@ void
 LRUMemoryManager::add_to_free_list(LRUMemoryHunk* hunk) noexcept
 {
     // Put back to the appropriate free bin
-    int bin = get_bin_index(static_cast<size_t>(hunk->size));
+    const int bin = get_bin_index(static_cast<size_t>(hunk->size));
     ListLinks* anchor = &free_bins_[bin];
     ListLinks* target = &hunk->free_links;
 
@@ -350,7 +351,7 @@ void
 LRUMemoryManager::remove_from_free_list(LRUMemoryHunk* hunk) noexcept
 {
     const size_t bin_idx = get_bin_index(std::abs(hunk->size));
-    ListLinks* target = &hunk->free_links;
+    const ListLinks* target = &hunk->free_links;
 
     // remove from free ring
     target->prev->next = target->next;

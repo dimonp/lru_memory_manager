@@ -1,4 +1,3 @@
-#include <iostream>
 #include <vector>
 #include <random>
 #include <benchmark/benchmark.h>
@@ -6,11 +5,11 @@
 #include "lru_memory_manager/lrumemorymanager.h"
 
 // Benchmark for allocating memory with random sizes
-static void BM_LRUAllocAllocationRandomSize(benchmark::State& state) 
+static void BM_LRUAllocAllocationRandomSize(benchmark::State& state)
 {
     std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles;
     handles.resize(100000000);
-    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
+    lrumm::LRUMemoryManager manager(32 * 1024 * 1024);
 
     size_t handle_idx = 0;
     for ([[maybe_unused]] auto _ : state) {
@@ -23,27 +22,29 @@ static void BM_LRUAllocAllocationRandomSize(benchmark::State& state)
         auto* handle = &handles[handle_idx++];
         manager.alloc(handle, alloc_size);
     }
+    state.SetItemsProcessed(state.iterations());
+    state.SetLabel("alloc");
 }
 
 // Benchmark for allocating memory and freeing it
-static void BM_LRUAllocAllocationFree(benchmark::State& state) 
+static void BM_LRUAllocAllocationFree(benchmark::State& state)
 {
     lrumm::LRUMemoryManager::LRUMemoryHandle handle;
-    lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
+    lrumm::LRUMemoryManager manager(4 * 1024 * 1024);
 
     size_t alloc_size = state.range(0); // Get size from benchmark argument
     for ([[maybe_unused]] auto _ : state) {
         manager.alloc(&handle, alloc_size);
         manager.free(&handle); // Deallocate memory
     }
-    state.SetBytesProcessed(int64_t(state.iterations()) * alloc_size);
+    state.SetItemsProcessed(state.iterations());
     state.SetLabel("alloc_free");
 
-    state.SetComplexityN(state.range(0));
+    state.SetComplexityN(alloc_size);
 }
 
 // Benchmark for allocating memory with fixed size
-static void BM_LRUAllocAllocation(benchmark::State& state) 
+static void BM_LRUAllocAllocation(benchmark::State& state)
 {
     std::vector<lrumm::LRUMemoryManager::LRUMemoryHandle> handles;
     handles.resize(100000000);
@@ -60,14 +61,14 @@ static void BM_LRUAllocAllocation(benchmark::State& state)
         auto* handle = &handles[handle_idx++];
         manager.alloc(handle, alloc_size);
     }
-    state.SetBytesProcessed(int64_t(state.iterations()) * alloc_size);
+    state.SetItemsProcessed(state.iterations());
     state.SetLabel("alloc");
 
-    state.SetComplexityN(state.range(0));
+    state.SetComplexityN(alloc_size);
 }
 
 // Benchmark for allocating memory with random sizes
-static void BM_LRUAllocAllocationFreeRandomSize(benchmark::State& state) 
+static void BM_LRUAllocAllocationFreeRandomSize(benchmark::State& state)
 {
     lrumm::LRUMemoryManager::LRUMemoryHandle handle;
     lrumm::LRUMemoryManager manager(16 * 1024 * 1024);
@@ -77,10 +78,12 @@ static void BM_LRUAllocAllocationFreeRandomSize(benchmark::State& state)
         manager.alloc(&handle, alloc_size);
         manager.free(&handle); // Deallocate memory
     }
+    state.SetItemsProcessed(state.iterations());
+    state.SetLabel("alloc_free");
 }
 
 // Benchmark for get_buffer_and_refresh (accessing and refreshing LRU items)
-static void BM_LRUGetBufferAndRefresh(benchmark::State& state) 
+static void BM_LRUGetBufferAndRefresh(benchmark::State& state)
 {
     size_t num_handles = state.range(0);
     size_t alloc_size = state.range(1);
@@ -115,7 +118,7 @@ static void BM_LRUGetBufferAndRefresh(benchmark::State& state)
 }
 
 // Benchmark for freeing memory
-static void BM_LRUFree(benchmark::State& state) 
+static void BM_LRUFree(benchmark::State& state)
 {
     size_t num_handles = state.range(0);
     size_t alloc_size = state.range(1);
@@ -157,7 +160,7 @@ static void BM_LRUFree(benchmark::State& state)
 }
 
 // Benchmark for mixed allocation/deallocation workload
-static void BM_LRUMixedWorkload(benchmark::State& state) 
+static void BM_LRUMixedWorkload(benchmark::State& state)
 {
     size_t num_handles = state.range(0);
     size_t alloc_size = state.range(1);
@@ -215,17 +218,13 @@ static void BM_LRUMixedWorkload(benchmark::State& state)
 }
 
 // Benchmark for LRU eviction performance
-static void BM_LRUEviction(benchmark::State& state) 
+static void BM_LRUEviction(benchmark::State& state)
 {
     size_t pool_size = state.range(0);
     size_t alloc_size = state.range(1);
-    size_t num_allocations = state.range(2);
 
     lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1;
     lrumm::LRUMemoryManager manager(pool_size);
-
-    // Pre-allocate handles
-    std::vector<void*> pointers(num_allocations);
 
     size_t evicted_count = 0;
     for ([[maybe_unused]] auto _ : state) {
@@ -241,15 +240,12 @@ static void BM_LRUEviction(benchmark::State& state)
         }
         benchmark::DoNotOptimize(pointer);
     }
-
-    state.SetItemsProcessed(state.iterations() * num_allocations);
-    state.SetLabel("eviction");
-    state.counters["Evictions"] = benchmark::Counter(evicted_count, benchmark::Counter::kAvgThreads);
+    state.SetItemsProcessed(state.iterations());
 
     state.SetComplexityN(state.range(1));
 }
 
-static void BM_LRURandomAllocFree(benchmark::State& state) 
+static void BM_LRURandomAllocFree(benchmark::State& state)
 {
     static constexpr size_t MIN_ALLOC = 128;
     static constexpr size_t MAX_ALLOC = 4096;
@@ -274,9 +270,8 @@ static void BM_LRURandomAllocFree(benchmark::State& state)
         } else {
             manager.free(&handle);
         }
-
-        benchmark::DoNotOptimize(manager);
     }
+    state.SetItemsProcessed(state.iterations());
 }
 
 BENCHMARK(BM_LRUAllocAllocationRandomSize);

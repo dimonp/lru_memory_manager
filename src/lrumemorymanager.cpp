@@ -8,6 +8,7 @@
 namespace lrumm {
 
 inline constexpr size_t MINIMUM_ALLOCATE_BLOCK = 64;
+inline constexpr size_t MINIMUM_FREE_BLOCK = 128;
 inline constexpr size_t NUMBER_OF_BINS = 32;
 
 inline
@@ -88,7 +89,7 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
     , free_bins_(nullptr)
     , lru_anchor_(nullptr)
 {
-    Ensures(mem_pool_size > MINIMUM_ALLOCATE_BLOCK);
+    Ensures(mem_pool_size > MINIMUM_ALLOCATE_BLOCK + sizeof(LRUMemoryHunk));
 
     free_bins_ = new ListLinks[NUMBER_OF_BINS];
     lru_anchor_ = new ListLinks();
@@ -186,7 +187,7 @@ LRUMemoryManager::get_head_hunk() const noexcept
  * This is the "Hot Path" of the allocator.
  */
 LRUMemoryManager::LRUMemoryHunk*
-LRUMemoryManager::find_free_block(size_t size) noexcept
+LRUMemoryManager::find_free_block(size_t size) const noexcept
 {
     // Mask out all bins smaller than requested
     const uint32_t mask = free_bin_mask_ & (~0U << get_bin_index(size));
@@ -214,32 +215,35 @@ LRUMemoryManager::find_free_block(size_t size) noexcept
 void
 LRUMemoryManager::split_block(LRUMemoryHunk* hunk, size_t size) noexcept
 {
+    if (hunk->size < (ptrdiff_t)(size + MINIMUM_FREE_BLOCK)) {
+        return;
+    }
+
     ASAN_UNPOISON_MEMORY_REGION(
         reinterpret_cast<uint8_t*>(hunk) + sizeof(LRUMemoryHunk),
         std::abs(hunk->size) - sizeof(LRUMemoryHunk)
     );
 
-    if (hunk->size >= (ptrdiff_t)(size + 128)) {
-        LRUMemoryHunk* remain = reinterpret_cast<LRUMemoryHunk*>(
-            reinterpret_cast<uint8_t*>(hunk) + size);
+    LRUMemoryHunk* remain = reinterpret_cast<LRUMemoryHunk*>(
+        reinterpret_cast<uint8_t*>(hunk) + size
+    );
 
-        remain->size = hunk->size - size;
-        hunk->size = (ptrdiff_t)size;
+    remain->size = hunk->size - size;
+    hunk->size = (ptrdiff_t)size;
 
-        // Maintain physical memory order for future coalescing
-        remain->phys_next = hunk->phys_next;
-        remain->phys_prev = hunk;
-        if (hunk->phys_next) { hunk->phys_next->phys_prev = remain; }
-        hunk->phys_next = remain;
+    // Maintain physical memory order for future coalescing
+    remain->phys_next = hunk->phys_next;
+    remain->phys_prev = hunk;
+    if (hunk->phys_next) { hunk->phys_next->phys_prev = remain; }
+    hunk->phys_next = remain;
 
-        // Re-insert the leftover part into the free list/bins
-        add_to_free_list(remain);
+    // Re-insert the leftover part into the free list/bins
+    add_to_free_list(remain);
 
-        ASAN_POISON_MEMORY_REGION(
-            reinterpret_cast<uint8_t*>(remain) + sizeof(LRUMemoryHunk),
-            static_cast<size_t>(remain->size) - sizeof(LRUMemoryHunk)
-        );
-    }
+    ASAN_POISON_MEMORY_REGION(
+        reinterpret_cast<uint8_t*>(remain) + sizeof(LRUMemoryHunk),
+        static_cast<size_t>(remain->size) - sizeof(LRUMemoryHunk)
+    );
 }
 
 /**

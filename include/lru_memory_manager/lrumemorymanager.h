@@ -114,7 +114,7 @@ private:
     void real_free(LRUMemoryHandle *handle) noexcept;
 
     // Core allocation sub-steps
-    inline LRUMemoryHunk* find_free_block(size_t size) noexcept;
+    inline LRUMemoryHunk* find_free_block(size_t size) const noexcept;
     inline void split_block(LRUMemoryHunk* hunk, size_t size) noexcept;
     inline void activate_lru_hunk(LRUMemoryHunk* hunk) noexcept;
     inline LRUMemoryHunk* try_alloc(size_t size) noexcept;

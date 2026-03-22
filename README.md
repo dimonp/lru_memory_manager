@@ -270,7 +270,7 @@ Performance characteristics on typical hardware:
 - Allocation: ~15ns average
 - Deallocation: ~15ns average
 - LRU refresh: ~5ns average
-- Eviction: ~100ns average
+- Eviction: ~200ns average
 
 ## AddressSanitizer Integration
 

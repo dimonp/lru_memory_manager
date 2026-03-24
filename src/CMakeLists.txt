@@ -15,11 +15,11 @@ target_sources(lru_memory_manager
 target_include_directories(lru_memory_manager PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/lru_memory_manager>)
-    
+
 target_link_libraries(lru_memory_manager PRIVATE lrumm_project_options)
 target_link_libraries(lru_memory_manager PUBLIC Microsoft.GSL::GSL)
 
-install(TARGETS lru_memory_manager 
+install(TARGETS lru_memory_manager
     EXPORT lru_memory_manager_targets
         FILE_SET HEADERS DESTINATION include
         LIBRARY DESTINATION lib)

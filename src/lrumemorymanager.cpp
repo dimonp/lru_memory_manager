@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
-
 #include <sanitizer/asan_interface.h>
 
 #include "lru_memory_manager/lrumemorymanager.h"
@@ -78,7 +77,7 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
     , free_anchor_(nullptr)
     , lru_anchor_(nullptr)
 {
-    assert(mem_pool_size > 0);
+    Expects(mem_pool_size > 0);
 
     mem_pool_ = new char[mem_total_size_];
     if (!mem_pool_) {

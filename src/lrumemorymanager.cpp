@@ -39,20 +39,21 @@ inline
 size_t
 get_bin_index(size_t size)
 {
-    if (size <= 64) { return 0; }
+    if (size <= LRUMemoryManager::MINIMUM_ALLOCATE_BLOCK) { return 0; }
     return 31 - portable_clz(static_cast<uint32_t>(size));
 }
 
 struct LRUMemoryManager::LRUMemoryHunk {
-    ptrdiff_t size; // Positive = Free, Negative = Allocated
-    LRUMemoryHandle *handle;
-    LRUMemoryHunk *phys_prev, *phys_next;
+    struct alignas(LRUMemoryManager::BLOCK_ALIGNMENT) {
+        ptrdiff_t size; // Positive = Free, Negative = Allocated
+        LRUMemoryHandle *handle;
+        LRUMemoryHunk *phys_prev, *phys_next;
 
-    union {
-        struct { LRUMemoryHunk *free_next, *free_prev; };
-        struct { LRUMemoryHunk *most_recent, *least_recent; };
+        union {
+            struct { LRUMemoryHunk *free_next, *free_prev; };
+            struct { LRUMemoryHunk *most_recent, *least_recent; };
+        };
     };
-
     uint8_t data_ptr[];
 };
 
@@ -66,8 +67,7 @@ LRUMemoryManager::LRUMemoryHandle::least_recent() const
 size_t
 LRUMemoryManager::LRUMemoryHandle::size() const
 {
-    assert(hunk_ != nullptr);
-    return std::abs(hunk_->size) - sizeof(LRUMemoryHunk);
+    return hunk_ != nullptr ? std::abs(hunk_->size) - sizeof(LRUMemoryHunk) : 0;
 }
 
 LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
@@ -79,7 +79,8 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
 {
     Expects(mem_pool_size > 0);
 
-    mem_pool_ = new char[mem_total_size_];
+    void* raw = ::operator new(mem_pool_size, std::align_val_t{BLOCK_ALIGNMENT});
+    mem_pool_ = static_cast<char*>(raw);
     if (!mem_pool_) {
         LOG_ERROR("Failed to allocate memory pool of size %zu.\n", mem_pool_size);
         std::abort();
@@ -99,7 +100,7 @@ LRUMemoryManager::~LRUMemoryManager() noexcept
         reinterpret_cast<uint8_t*>(first) + sizeof(LRUMemoryHunk),
         first->size - sizeof(LRUMemoryHunk)
     );
-    delete [] mem_pool_;
+    ::operator delete(mem_pool_, std::align_val_t{BLOCK_ALIGNMENT});
 }
 
 void LRUMemoryManager::init_pool() {
@@ -117,12 +118,14 @@ void LRUMemoryManager::init_pool() {
     free_anchor_->size = 0;
     free_anchor_->phys_next = nullptr;
     free_anchor_->phys_prev = nullptr;
+    lru_anchor_->handle = nullptr;
 
     lru_anchor_->most_recent = lru_anchor_;
     lru_anchor_->least_recent = lru_anchor_;
     lru_anchor_->size = 0;
     lru_anchor_->phys_next = nullptr;
     lru_anchor_->phys_prev = nullptr;
+    lru_anchor_->handle = nullptr;
 
     // Initial big free block
     size_t header_offset = ptr - mem_pool_;
@@ -164,8 +167,8 @@ LRUMemoryManager::arena_clean()
 LRUMemoryManager::LRUMemoryHunk*
 LRUMemoryManager::get_head_hunk() const noexcept
 {
-    uint8_t* head_hunk_ptr = reinterpret_cast<uint8_t*>(lru_anchor_) + sizeof(LRUMemoryHunk);
-    return reinterpret_cast<LRUMemoryHunk*>(head_hunk_ptr);
+    uint8_t* head_hunk = reinterpret_cast<uint8_t*>(lru_anchor_) + sizeof(LRUMemoryHunk);
+    return reinterpret_cast<LRUMemoryHunk*>(head_hunk);
 }
 
 LRUMemoryManager::LRUMemoryHunk*
@@ -210,6 +213,10 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
         remain->free_next->free_prev = remain;
         remain->free_prev->free_next = remain;
 
+        // Remove found from free list
+        found->free_next = nullptr;
+        found->free_prev = nullptr;
+
         // poison remain free
         ASAN_POISON_MEMORY_REGION(
             reinterpret_cast<uint8_t*>(remain) + sizeof(LRUMemoryHunk),
@@ -218,6 +225,8 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
     } else {
         found->free_prev->free_next = found->free_next;
         found->free_next->free_prev = found->free_prev;
+        found->free_next = nullptr;
+        found->free_prev = nullptr;
     }
 
     // Insert into LRU ring (Most Recent position)
@@ -233,46 +242,49 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
 }
 
 void*
-LRUMemoryManager::real_get_buffer(LRUMemoryHandle *handle_ptr) noexcept
+LRUMemoryManager::real_get_buffer(LRUMemoryHandle *handle) noexcept
 {
-    if (handle_ptr->hunk_ == nullptr) {
+    if (handle->hunk_ == nullptr) {
         return nullptr;
     }
 
-    LRUMemoryHunk *hunk_ptr = handle_ptr->hunk_;
+    LRUMemoryHunk *hunk = handle->hunk_;
 
     // most recent already ?
-    if (lru_anchor_->least_recent == hunk_ptr) {
-        return hunk_ptr->data_ptr;
+    if (lru_anchor_->least_recent == hunk) {
+        return hunk->data_ptr;
     }
 
     // remove from current LRU position
-    hunk_ptr->least_recent->most_recent = hunk_ptr->most_recent;
-    hunk_ptr->most_recent->least_recent = hunk_ptr->least_recent;
+    hunk->least_recent->most_recent = hunk->most_recent;
+    hunk->most_recent->least_recent = hunk->least_recent;
 
     // Move to top LRU position
-    hunk_ptr->least_recent = lru_anchor_->least_recent;
-    hunk_ptr->most_recent = lru_anchor_;
+    hunk->least_recent = lru_anchor_->least_recent;
+    hunk->most_recent = lru_anchor_;
 
     // update neighbors
-    lru_anchor_->least_recent->most_recent = hunk_ptr;
-    lru_anchor_->least_recent = hunk_ptr;
+    lru_anchor_->least_recent->most_recent = hunk;
+    lru_anchor_->least_recent = hunk;
 
-    return hunk_ptr->data_ptr;
+    return hunk->data_ptr;
 }
 
 void*
-LRUMemoryManager::real_alloc(LRUMemoryHandle *handle_ptr, size_t size) noexcept
+LRUMemoryManager::real_alloc(LRUMemoryHandle *handle, size_t size) noexcept
 {
     size_t aligned_size = align_up(size + sizeof(LRUMemoryHunk));
 
     // Try to find and allocate
     while (true) {
-        LRUMemoryHunk* hunk_ptr = try_alloc(aligned_size);
-        if (hunk_ptr) {
-            hunk_ptr->handle = handle_ptr;
-            handle_ptr->hunk_ = hunk_ptr;
-            return hunk_ptr->data_ptr;
+        LRUMemoryHunk* hunk = try_alloc(aligned_size);
+        size_t vv = sizeof(LRUMemoryHunk);
+        ptrdiff_t pp = reinterpret_cast<char*>(hunk->data_ptr) - reinterpret_cast<char*>(hunk);
+
+        if (hunk) {
+            hunk->handle = handle;
+            handle->hunk_ = hunk;
+            return hunk->data_ptr;
         }
 
         // If no free space found, try to free the least recently used hunk
@@ -287,58 +299,56 @@ LRUMemoryManager::real_alloc(LRUMemoryHandle *handle_ptr, size_t size) noexcept
 }
 
 void
-LRUMemoryManager::real_free(LRUMemoryHandle *handle_ptr) noexcept
+LRUMemoryManager::real_free(LRUMemoryHandle *handle) noexcept
 {
-    LRUMemoryHunk* hunk_ptr = handle_ptr->hunk_;
+    LRUMemoryHunk* hunk = handle->hunk_;
 
     // Remove from LRU
-    hunk_ptr->least_recent->most_recent = hunk_ptr->most_recent;
-    hunk_ptr->most_recent->least_recent = hunk_ptr->least_recent;
+    hunk->least_recent->most_recent = hunk->most_recent;
+    hunk->most_recent->least_recent = hunk->least_recent;
 
-    hunk_ptr->size = std::abs(hunk_ptr->size);
-    mem_allocated_size_ -= hunk_ptr->size;
+    hunk->size = std::abs(hunk->size);
+    mem_allocated_size_ -= hunk->size;
+    handle->hunk_ = nullptr;
 
     // Coalesce Right
-    LRUMemoryHunk* r_neighbor = hunk_ptr->phys_next;
+    LRUMemoryHunk* r_neighbor = hunk->phys_next;
     if (r_neighbor && r_neighbor->size > 0) {
         // remove from free ring
         r_neighbor->free_prev->free_next = r_neighbor->free_next;
         r_neighbor->free_next->free_prev = r_neighbor->free_prev;
-        hunk_ptr->size += r_neighbor->size;
-        hunk_ptr->phys_next = r_neighbor->phys_next;
+        hunk->size += r_neighbor->size;
+        hunk->phys_next = r_neighbor->phys_next;
         if (r_neighbor->phys_next) {
-            r_neighbor->phys_next->phys_prev = hunk_ptr;
+            r_neighbor->phys_next->phys_prev = hunk;
         }
     }
 
     // Coalesce Left
-    LRUMemoryHunk* l_neighbor = hunk_ptr->phys_prev;
+    LRUMemoryHunk* l_neighbor = hunk->phys_prev;
     if (l_neighbor && l_neighbor->size > 0) {
         // remove from free ring
         l_neighbor->free_prev->free_next = l_neighbor->free_next;
         l_neighbor->free_next->free_prev = l_neighbor->free_prev;
-        l_neighbor->size += hunk_ptr->size;
-        l_neighbor->phys_next = hunk_ptr->phys_next;
-        if (hunk_ptr->phys_next) {
-            hunk_ptr->phys_next->phys_prev = l_neighbor;
+        l_neighbor->size += hunk->size;
+        l_neighbor->phys_next = hunk->phys_next;
+        if (hunk->phys_next) {
+            hunk->phys_next->phys_prev = l_neighbor;
         }
-        hunk_ptr = l_neighbor;
+        hunk = l_neighbor;
     }
 
     // Return to free ring
-    hunk_ptr->free_next = free_anchor_->free_next;
-    hunk_ptr->free_prev = free_anchor_;
-    free_anchor_->free_next->free_prev = hunk_ptr;
-    free_anchor_->free_next = hunk_ptr;
-    hunk_ptr->handle = nullptr;
+    hunk->free_next = free_anchor_->free_next;
+    hunk->free_prev = free_anchor_;
+    free_anchor_->free_next->free_prev = hunk;
+    free_anchor_->free_next = hunk;
+    hunk->handle = nullptr;
 
     ASAN_POISON_MEMORY_REGION(
-        reinterpret_cast<uint8_t*>(hunk_ptr) + sizeof(LRUMemoryHunk),
-        hunk_ptr->size - sizeof(LRUMemoryHunk)
+        reinterpret_cast<uint8_t*>(hunk) + sizeof(LRUMemoryHunk),
+        hunk->size - sizeof(LRUMemoryHunk)
     );
-
-    // invalidate handle
-    handle_ptr->hunk_ = nullptr;
 }
 
 void

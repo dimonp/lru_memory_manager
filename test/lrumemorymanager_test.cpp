@@ -29,6 +29,31 @@ protected:
     }
 };
 
+TEST_F(LRUMemoryManagerTest, BasicAllocAlignment) {
+    lrumm::LRUMemoryManager::LRUMemoryHandle h1;
+    lrumm::LRUMemoryManager sut(kPoolSize);
+
+    void* ptr = sut.alloc(&h1, 100);
+
+    ASSERT_NE(ptr, nullptr);
+    EXPECT_GE(h1.size(), 100);
+    EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) % lrumm::LRUMemoryManager::BLOCK_ALIGNMENT, 0);
+}
+
+TEST_F(LRUMemoryManagerTest, BlockSplitting) {
+    lrumm::LRUMemoryManager::LRUMemoryHandle h1, h2;
+    lrumm::LRUMemoryManager sut(kPoolSize);
+
+    sut.alloc(&h1, 64);
+    size_t allocated_before = sut.get_allocated_memory_size();
+
+    sut.alloc(&h2, 64);
+    size_t allocated_after = sut.get_allocated_memory_size();
+
+    EXPECT_GT(allocated_after, allocated_before);
+    EXPECT_NE(h1.hunk_ptr(), h2.hunk_ptr());
+}
+
 TEST_F(LRUMemoryManagerTest, CopyDisabled)
 {
     lrumm::LRUMemoryManager::LRUMemoryHandle handle;
@@ -324,7 +349,7 @@ TEST_F(LRUMemoryManagerTest, ZeroSizeAllocation)
 TEST_F(LRUMemoryManagerTest, LruEvictionOrder)
 {
     // Allocate chunks that should fill most of the memory
-    constexpr size_t kAllocateSize = 400;
+    constexpr size_t kAllocateSize = 350;
     lrumm::LRUMemoryManager::LRUMemoryHandle handle1, handle2, handle3, handle4;
     lrumm::LRUMemoryManager sut(kPoolSize);
 
@@ -335,10 +360,10 @@ TEST_F(LRUMemoryManagerTest, LruEvictionOrder)
     void* ptr4 = sut.alloc(&handle4, kAllocateSize);
 
     // All allocations should succeed initially
-    EXPECT_NE(ptr1, nullptr);
-    EXPECT_NE(ptr2, nullptr);
-    EXPECT_NE(ptr3, nullptr);
-    EXPECT_NE(ptr4, nullptr);
+    EXPECT_NE(handle1.size(), 0);
+    EXPECT_NE(handle2.size(), 0);
+    EXPECT_NE(handle3.size(), 0);
+    EXPECT_NE(handle4.size(), 0);
 
     // Access handle2 to make it recently used
     sut.get_buffer_and_refresh(&handle2);
@@ -350,10 +375,39 @@ TEST_F(LRUMemoryManagerTest, LruEvictionOrder)
 
     EXPECT_NE(ptr5, nullptr) << "New allocation should succeed.";
     EXPECT_EQ(handle1.hunk_ptr(), nullptr) << "Handle1 should have been evicted.";
+    EXPECT_EQ(handle1.size(), 0) << "Size of evicted handle1 should have been zero.";
     EXPECT_NE(handle2.hunk_ptr(), nullptr) << "Handle2 should not have been evicted.";
     EXPECT_NE(handle3.hunk_ptr(), nullptr) << "Handle3 should not have been evicted.";
     EXPECT_NE(handle4.hunk_ptr(), nullptr) << "Handle4 should not have been evicted.";
     EXPECT_NE(handle5.hunk_ptr(), nullptr) << "Handle5 should be allocated.";
+}
+
+TEST_F(LRUMemoryManagerTest, IteratorIterationEmpty) {
+    lrumm::LRUMemoryManager sut(kPoolSize);
+
+    auto it = sut.begin();
+    auto end = sut.end();
+    EXPECT_EQ(it, end);
+}
+
+TEST_F(LRUMemoryManagerTest, IteratorIteration) {
+    lrumm::LRUMemoryManager::LRUMemoryHandle h1, h2;
+    lrumm::LRUMemoryManager sut(kPoolSize);
+
+    sut.alloc(&h1, 100);
+    sut.alloc(&h2, 100);
+
+    int count = 0;
+    auto it = sut.begin();
+    auto end = sut.end();
+
+    while (it != end) {
+        ASSERT_NE(&(*it), nullptr);
+        count++;
+        ++it;
+    }
+
+    EXPECT_EQ(count, 2);
 }
 
 TEST_F(LRUMemoryManagerTest, IteratorComparison)

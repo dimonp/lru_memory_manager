@@ -110,9 +110,9 @@ private:
 
     void init_pool();
 
-    alignas(BLOCK_ALIGNMENT) LRUMemoryHunk* free_anchor_;
-    alignas(BLOCK_ALIGNMENT) LRUMemoryHunk* lru_anchor_;
-    alignas(BLOCK_ALIGNMENT) char* mem_pool_;
+    LRUMemoryHunk* free_anchor_;
+    LRUMemoryHunk* lru_anchor_;
+    char* mem_pool_;
 
     size_t mem_total_size_;      ///< Total size of the memory pool
     size_t mem_allocated_size_;  ///< Currently allocated size

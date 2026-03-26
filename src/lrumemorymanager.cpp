@@ -14,35 +14,6 @@ align_up(size_t size) {
     return (size + (LRUMemoryManager::BLOCK_ALIGNMENT - 1)) & ~(LRUMemoryManager::BLOCK_ALIGNMENT - 1);
 }
 
-inline int portable_clz(uint32_t x) {
-    if (x == 0) { return 32; }
-#if defined(__GNUC__) || defined(__clang__)
-    return __builtin_clz(x);
-#elif defined(_MSC_VER)
-    unsigned long leading_zero = 0;
-    if (_BitScanReverse(&leading_zero, x)) {
-        return 31 - leading_zero;
-    }
-    return 32;
-#else
-    int n = 0;
-    if (x <= 0x0000FFFF) { n += 16; x <<= 16; }
-    if (x <= 0x00FFFFFF) { n += 8;  x <<= 8;  }
-    if (x <= 0x0FFFFFFF) { n += 4;  x <<= 4;  }
-    if (x <= 0x3FFFFFFF) { n += 2;  x <<= 2;  }
-    if (x <= 0x7FFFFFFF) { n += 1; }
-    return n;
-#endif
-}
-
-inline
-size_t
-get_bin_index(size_t size)
-{
-    if (size <= LRUMemoryManager::MINIMUM_ALLOCATE_BLOCK) { return 0; }
-    return 31 - portable_clz(static_cast<uint32_t>(size));
-}
-
 struct LRUMemoryManager::LRUMemoryHunk {
     struct alignas(LRUMemoryManager::BLOCK_ALIGNMENT) {
         ptrdiff_t size; // Positive = Free, Negative = Allocated

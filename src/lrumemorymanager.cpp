@@ -62,15 +62,14 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
 LRUMemoryManager::~LRUMemoryManager() noexcept
 {
     flush();
-
     // Unpoison before deallocation to avoid false positives during potential internal checks
     char* ptr = mem_pool_ + sizeof(LRUMemoryHunk) * 2;
     LRUMemoryHunk* first = reinterpret_cast<LRUMemoryHunk*>(ptr);
-
     ASAN_UNPOISON_MEMORY_REGION(
         reinterpret_cast<uint8_t*>(first) + sizeof(LRUMemoryHunk),
         first->size - sizeof(LRUMemoryHunk)
     );
+
     ::operator delete(mem_pool_, std::align_val_t{BLOCK_ALIGNMENT});
 }
 
@@ -184,10 +183,6 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
         remain->free_next->free_prev = remain;
         remain->free_prev->free_next = remain;
 
-        // Remove found from free list
-        found->free_next = nullptr;
-        found->free_prev = nullptr;
-
         // poison remain free
         ASAN_POISON_MEMORY_REGION(
             reinterpret_cast<uint8_t*>(remain) + sizeof(LRUMemoryHunk),
@@ -196,9 +191,11 @@ LRUMemoryManager::try_alloc(size_t size) noexcept
     } else {
         found->free_prev->free_next = found->free_next;
         found->free_next->free_prev = found->free_prev;
-        found->free_next = nullptr;
-        found->free_prev = nullptr;
     }
+
+    // Remove found from free list
+    found->free_next = nullptr;
+    found->free_prev = nullptr;
 
     // Insert into LRU ring (Most Recent position)
     found->least_recent = lru_anchor_->least_recent;
@@ -249,9 +246,6 @@ LRUMemoryManager::real_alloc(LRUMemoryHandle *handle, size_t size) noexcept
     // Try to find and allocate
     while (true) {
         LRUMemoryHunk* hunk = try_alloc(aligned_size);
-        size_t vv = sizeof(LRUMemoryHunk);
-        ptrdiff_t pp = reinterpret_cast<char*>(hunk->data_ptr) - reinterpret_cast<char*>(hunk);
-
         if (hunk) {
             hunk->handle = handle;
             handle->hunk_ = hunk;

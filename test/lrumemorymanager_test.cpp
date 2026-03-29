@@ -254,7 +254,7 @@ TEST_F(LRUMemoryManagerTest, GetAllocatedMemorySize)
     EXPECT_EQ(sut.get_allocated_memory_size(), initial_size);
 }
 
-TEST_F(LRUMemoryManagerTest, Flush)
+TEST_F(LRUMemoryManagerTest, Clean)
 {
     constexpr size_t kExpectedSize0 = 50, kExpectedSize1 = 150, kExpectedSize2 = 250;
     lrumm::LRUMemoryManager::LRUMemoryHandle handle0, handle1, handle2;
@@ -266,7 +266,7 @@ TEST_F(LRUMemoryManagerTest, Flush)
 
     EXPECT_NE(sut.begin(), sut.end()) << "Should not be empty.";
 
-    sut.flush();
+    sut.arena_clean();
 
     EXPECT_EQ(sut.begin(), sut.end()) << "Should be empty after flush.";
 }
@@ -285,7 +285,7 @@ TEST_F(LRUMemoryManagerTest, ArenaClean)
 
     sut.arena_clean();
 
-    EXPECT_EQ(sut.begin(), sut.end()) << "Should be empty after flush.";
+    EXPECT_EQ(sut.begin(), sut.end()) << "Should be empty after clean.";
 }
 
 TEST_F(LRUMemoryManagerTest, HandleMethods)
@@ -572,11 +572,11 @@ TEST_F(LRUMemoryManagerTest, GetBufferAndRefreshNullHandle)
     EXPECT_EQ(ptr, nullptr);
 }
 
-TEST_F(LRUMemoryManagerTest, FlushEmpty)
+TEST_F(LRUMemoryManagerTest, CleanEmpty)
 {
     lrumm::LRUMemoryManager sut(kPoolSize);
     // Should not crash
-    sut.flush();
+    sut.arena_clean();
     EXPECT_EQ(sut.begin(), sut.end());
 }
 
@@ -677,7 +677,7 @@ TEST_F(LRUMemoryManagerTest, AsanPositiveMultipleAllocations)
     sut.free(&handle3);
 }
 
-TEST_F(LRUMemoryManagerTest, AsanPositiveFlush)
+TEST_F(LRUMemoryManagerTest, AsanPositiveClean)
 {
     // This test verifies that flush operation doesn't trigger ASAN errors
     constexpr size_t kExpectedSize = 75;
@@ -690,9 +690,9 @@ TEST_F(LRUMemoryManagerTest, AsanPositiveFlush)
     sut.alloc(&handle3, kExpectedSize);
 
     // Flush all allocations - should not trigger ASAN errors
-    sut.flush();
+    sut.arena_clean();
 
-    EXPECT_EQ(sut.begin(), sut.end()) << "Should be empty after flush.";
+    EXPECT_EQ(sut.begin(), sut.end()) << "Should be empty after clean.";
 }
 
 // ASAN False Scenario Tests (These would normally trigger ASAN errors in a real environment)

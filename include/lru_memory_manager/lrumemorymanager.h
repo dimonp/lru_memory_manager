@@ -93,7 +93,6 @@ public:
     void* alloc(LRUMemoryHandle *handle, size_t size) noexcept;
     void free(LRUMemoryHandle *handle) noexcept;
     void* get_buffer_and_refresh(LRUMemoryHandle *handle) noexcept;
-    void flush();
     void arena_clean();
 
     void lru_state() const;

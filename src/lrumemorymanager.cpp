@@ -61,7 +61,7 @@ LRUMemoryManager::LRUMemoryManager(size_t mem_pool_size)
 
 LRUMemoryManager::~LRUMemoryManager() noexcept
 {
-    flush();
+    arena_clean();
     // Unpoison before deallocation to avoid false positives during potential internal checks
     char* ptr = mem_pool_ + sizeof(LRUMemoryHunk) * 2;
     LRUMemoryHunk* first = reinterpret_cast<LRUMemoryHunk*>(ptr);
@@ -120,17 +120,9 @@ void LRUMemoryManager::init_pool() {
 }
 
 void
-LRUMemoryManager::flush()
-{
-    // Keep removing the first allocated hunk until only the head remains
-    while(lru_anchor_->least_recent != lru_anchor_) {
-        real_free(lru_anchor_->least_recent->handle);
-    }
-}
-
-void
 LRUMemoryManager::arena_clean()
 {
+    ASAN_UNPOISON_MEMORY_REGION(mem_pool_, mem_total_size_);
     init_pool();
 }
 
